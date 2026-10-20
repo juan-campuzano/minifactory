@@ -56,6 +56,9 @@ To make a workflow routable: add `route:` and, if its input isn't an app spec, r
 - `src/minifactory/router.py`: discovery + confidence policy for `ask`. Plugins: `routers.py` (kind `router`), `intakes.py` (kind `intake`).
 - `src/minifactory/ui.py`: the pretty CLI (rich live board + summary). Only an event subscriber; `cli.py` falls back to plain sinks.
 - `src/minifactory/workspace.py` (find/init/config), `src/minifactory/templates.py` + `src/minifactory/templates/` (packaged workflows and their `assets/`: specs = jobs, fixtures = canned LLM replies).
+- `assets/brand/`: logo kit (svg/png/favicon, palette in its README; `python3 assets/brand/_build/build.py` regenerates it). README images use ABSOLUTE
+  raw.githubusercontent URLs because PyPI does not resolve relative paths; use the PNGs there (PyPI strips `<picture>`, so the `<img>` fallback is the light logo).
+  Binaries live in git history forever: commit a changed PNG deliberately, not on every tweak.
 - `examples/` (plugin example), `docs/plugins.md`, `tests/`.
 - Run artifacts: `.minifactory/runs/<workflow>/<job>/{state.json,result.json,work/}` and `events.jsonl`. Generated, git-ignored.
 

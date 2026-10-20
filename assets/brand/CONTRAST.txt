@@ -1,0 +1,12 @@
+Teal #14B8A6 on white               2.49:1  FAIL
+Teal #14B8A6 on off-white           2.38:1  FAIL
+Deep Teal #0F766E on white          5.47:1  AA
+Deep Teal #0F766E on off-white      5.23:1  AA
+Ink Navy #0F172A on white          17.85:1  AAA
+Ink Navy on off-white              17.06:1  AAA
+Teal #14B8A6 on navy                7.17:1  AAA
+Off-white on navy                  17.06:1  AAA
+Teal Tint on navy                  15.84:1  AAA
+Navy on Teal                        7.17:1  AAA
+Deep Teal on Teal Tint              4.86:1  AA
+Slate #64748B on off-white          4.55:1  AA

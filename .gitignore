@@ -9,3 +9,4 @@ output/
 .ruff_cache/
 build/
 dist/
+.DS_Store

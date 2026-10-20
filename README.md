@@ -1,4 +1,9 @@
-# minifactory
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/juan-campuzano/minifactory/main/assets/brand/png/minifactory-horizontal-dark.png">
+    <img src="https://raw.githubusercontent.com/juan-campuzano/minifactory/main/assets/brand/png/minifactory-horizontal-light.png" alt="minifactory" width="420">
+  </picture>
+</p>
 
 A tiny, pluggable **software factory**. You describe what you need, a **workflow** does the work, and every
 step an AI agent takes is fenced in by deterministic checks, budgets and a human-reviewable result.
