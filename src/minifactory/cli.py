@@ -49,6 +49,9 @@ def _parser() -> argparse.ArgumentParser:
 
     pl = sub.add_parser("plugins", help="list registered plugins")
     pl.add_argument("--plugin", action="append", default=[])
+    pl.add_argument("--schema", action="store_true",
+                    help="print what can be built: every step with its parameters, providers, the format rules")
+    pl.add_argument("--json", action="store_true", help="with --schema: machine-readable")
 
     init = sub.add_parser("init", help="create a workspace (minifactory.yaml + workflows/) in a folder")
     init.add_argument("folder", nargs="?", default=".")
@@ -59,6 +62,9 @@ def _parser() -> argparse.ArgumentParser:
     wf_sub.add_parser("list", help="your workflows and the templates that ship with the package")
     cp = wf_sub.add_parser("copy", help="copy a packaged template into your workspace")
     cp.add_argument("name")
+    en = wf_sub.add_parser("enable", help="review a drafted workflow and make it active (routable by `ask`)")
+    en.add_argument("name")
+    en.add_argument("--yes", action="store_true", help="don't ask for confirmation")
 
     demo = sub.add_parser("demo-init", help="create the demo sandbox (git remotes + catalog)")
     demo.add_argument("--dir", default="demo")
@@ -243,6 +249,30 @@ def _resolve_workflow(name: str, dirs: list[Path]) -> str:
                        "See `minifactory workflows list`")
 
 
+def _enable(args: argparse.Namespace, ws: workspace.Workspace | None) -> int:
+    """Show what a drafted workflow would do, then move it into the active workflows folder."""
+    from minifactory.review import review
+
+    if ws is None:
+        raise FactoryError("no workspace here. Run `minifactory init` first")
+    folder = ws.root / ws.config.workflows_dir
+    draft, target = folder / "drafts" / f"{args.name}.yaml", folder / f"{args.name}.yaml"
+    if not draft.is_file():
+        raise FactoryError(f"no draft named '{args.name}' in {draft.parent}")
+    if target.exists():
+        raise FactoryError(f"{target} already exists; remove or rename one of them first")
+    spec = load_workflow(draft)  # a draft written under other plugins may no longer validate
+    print(f"workflow '{spec.name}' ({len(spec.steps)} steps) would be enabled. Review:")
+    for finding in review(spec):
+        print(f"  {finding}")
+    if not args.yes and (not sys.stdin.isatty() or input("Enable it? [y/N] ").strip().lower() != "y"):
+        print("not enabled (confirm interactively or pass --yes)")
+        return 2
+    draft.rename(target)
+    print(f"enabled: {target.relative_to(ws.root)}")
+    return 0
+
+
 def _workflows(args: argparse.Namespace, ws: workspace.Workspace | None) -> int:
     if args.wf_cmd == "copy":
         if ws is None:
@@ -250,6 +280,8 @@ def _workflows(args: argparse.Namespace, ws: workspace.Workspace | None) -> int:
         for path in templates.copy(args.name, ws.root, ws.config.workflows_dir):
             print(f"  + {path.relative_to(ws.root)}")
         return 0
+    if args.wf_cmd == "enable":
+        return _enable(args, ws)
     print("your workflows:")
     mine = [f for folder in args.workflow_dirs for f in sorted(folder.glob("*.yaml"))]
     for f in mine:
@@ -260,6 +292,11 @@ def _workflows(args: argparse.Namespace, ws: workspace.Workspace | None) -> int:
             print(f"  {f.stem:<32} INVALID: {str(e)[:80]}")
     if not mine:
         print("  (none)")
+    drafts = [f for folder in args.workflow_dirs for f in sorted((folder / "drafts").glob("*.yaml"))]
+    if drafts:
+        print("\ndrafts (not routable until `minifactory workflows enable NAME`):")
+        for f in drafts:
+            print(f"  {f.stem:<32} {f}")
     print("\ntemplates (copy with `minifactory workflows copy NAME`):")
     for t in templates.available().values():
         print(f"  {t.name:<32} {t.description}")
@@ -290,6 +327,16 @@ def main(argv: list[str] | None = None) -> int:
             print(f"demo sandbox ready in ./{path}")
             return 0
 
+        if args.cmd == "plugins" and args.schema:
+            from minifactory import catalog as plugin_catalog
+
+            if args.json:
+                import json
+
+                print(json.dumps(plugin_catalog.describe(), indent=2, default=str))
+            else:
+                print(plugin_catalog.render_markdown())
+            return 0
         if args.cmd == "plugins":
             catalog = registry.catalog()
             if sys.stdout.isatty():

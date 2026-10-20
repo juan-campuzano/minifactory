@@ -33,6 +33,8 @@ class CloneParams(StrictParams):
 
 @register("step", "scm.clone")
 class Clone(Step):
+    """Clone the job's repository (its default branch unless `branch` is set) into the work directory."""
+
     Params = CloneParams
     needs = ("scm",)
 

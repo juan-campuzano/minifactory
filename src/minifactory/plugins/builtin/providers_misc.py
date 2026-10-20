@@ -16,6 +16,8 @@ from minifactory.core.registry import register
 
 @register("secrets", "env")
 class EnvSecrets:
+    """Secrets read from environment variables."""
+
     def get(self, name: str) -> str:
         try:
             return os.environ[name]
@@ -26,6 +28,8 @@ class EnvSecrets:
 # -- target sources: "what should we work on?" (your Neptune query lives here) ----------
 @register("source", "static")
 class StaticSource:
+    """A fixed list of jobs written in the workflow itself (`jobs: [{name: ...}]`)."""
+
     def __init__(self, jobs: list[dict[str, Any]]):
         self._jobs = jobs
 
@@ -63,12 +67,16 @@ class AppSpecSource:
 # -- executors: "where do jobs run?" (an AWS Batch executor would implement the same port)
 @register("executor", "local")
 class LocalExecutor:
+    """Run jobs one after another."""
+
     def run(self, jobs: list[Job], fn: Callable[[Job], JobResult]) -> list[JobResult]:
         return [fn(j) for j in jobs]
 
 
 @register("executor", "threads")
 class ThreadExecutor:
+    """Run up to `workers` jobs in parallel threads."""
+
     def __init__(self, workers: int = 4):
         self.workers = workers
 

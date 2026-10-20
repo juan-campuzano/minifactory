@@ -18,6 +18,8 @@ class ShellParams(StrictParams):
 
 @register("step", "shell.run")
 class ShellRun(Step):
+    """Run a shell command in the cloned repo; a non-zero exit fails the step (or passes it, with expect_failure)."""
+
     Params = ShellParams
 
     def run(self, ctx: StepContext, p: ShellParams) -> StepResult:

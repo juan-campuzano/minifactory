@@ -70,6 +70,19 @@ Edits use `util.apply_reply`: `PATCH:` blocks (exact SEARCH must match exactly o
 Verified 2026-10-20 with real Haiku 4.5 + Flutter on a repo with an injected bug (`+= 2` instead of `+= 1`): repro test red, one-line fix, 4 tests green.
 Not verified: a real GitHub repo (the run used a local-git remote), big repos, bugs spanning several files, `add-feature` (not built).
 
+## Workflows that write workflows (`create-workflow` template)
+`ask "create a workflow that ..."` -> `workflow-goal` intake (no LLM; the text is the goal) -> `workdir.init` -> `workflow.catalog` writes
+`CATALOG.md` (generated from the registry by `minifactory/catalog.py`: format rules + every step/plugin with parameters; plugins need their OWN
+class docstring, it is the description) and `EXAMPLE.yaml` -> `agent.edit` writes `draft.yaml` (`allowed_prefixes: [draft.yaml]`) -> `minifactory validate`
+is the gate -> `agent.repair_build` with `context` (validator errors in, patches out) -> `workflow.save_draft` writes `workflows/drafts/NAME.yaml`
+(never overwrites; name must match `^[a-z][a-z0-9_-]{1,60}$`) and adds `review:` notes (`minifactory/review.py`: shell commands, repo writes,
+GitHub/LLM spend, missing `route:`). Drafts are NOT discovered by `ask` (`discover` globs only the top folder). `minifactory workflows enable NAME`
+re-validates, prints the review, asks (or `--yes`) and moves the file. If the goal needs a nonexistent step the agent must reply `MISSING: ...`
+(reported by `agent.edit` as its failure reason). Only existing steps are composed: the agent never writes Python plugins.
+Verified 2026-10-20 with Haiku 4.5: a feasible goal gave a valid 4-step draft in 1 call (~$0.006); a Slack goal ended in `MISSING: slack.post`.
+Not done: a dry-run of the draft with fake providers (it is validated, reviewed and not executed); judging whether a *valid* draft is *sensible*
+is the reviewer's job (e.g. the dart-format draft picked the `repo-task` intake, which expects a bug description).
+
 ## Workspace (installable layout)
 Code ships in the package; user content lives in a workspace found like git: nearest `minifactory.yaml` upward from the cwd, else the global
 `$XDG_CONFIG_HOME/minifactory` (default `~/.config/minifactory`), else none (then everything is relative to the cwd, as in development).
@@ -117,7 +130,7 @@ See `docs/plugins.md` and `examples/hello_plugin.py`. Load it with `--plugin mod
   need better context/ordering between features (not solved).
 - Brownfield: only Flutter/Dart (analyze/test steps are Flutter's; other stacks need their own steps or `shell.run`). The repro test lives in
   `test/factory_repro_test.dart` and stays in the PR as a regression test.
-- Intakes: `app-spec` (new apps) and `repo-task` (bug in an existing repo). Adding workflows for existing repos (fix a bug, write tests...) needs new intakes.
+- Intakes: `workflow-goal` (goal of a new workflow), `app-spec` (new apps) and `repo-task` (bug in an existing repo). Adding workflows for existing repos (fix a bug, write tests...) needs new intakes.
 - LLM usage: providers may implement `complete_ex(system, prompt) -> (text, usage)`; only `bedrock` does (tokens + optional
   `cost_usd` from `price_per_mtok`, whose values are set by the user and must be re-checked). `openai` reports no tokens yet.
 - Real-LLM runs of the Flutter workflow (Bedrock, `FACTORY_FLUTTER=real`, `todo_app`), measured on 2026-10-20:

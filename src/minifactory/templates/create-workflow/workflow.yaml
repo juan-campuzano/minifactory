@@ -1,0 +1,72 @@
+# Drafts a NEW workflow from a plain-language goal, using only the steps and plugins this install has.
+# The result is a DRAFT in workflows/drafts/: not routable, never run, until you review and enable it
+# with `minifactory workflows enable NAME`. Needs AWS credentials (Bedrock). Costs LLM tokens.
+
+name: create-workflow
+
+route:
+  description: Create a new minifactory workflow from a description of what it should do (saved as a draft you review before enabling)
+  not_for:
+    - running or testing an existing workflow
+    - creating an app or project
+    - fixing a bug in a repository
+  examples:
+    - a workflow that runs the tests of a repository and opens a pull request when they pass
+    - create a workflow that formats the code with a shell command and delivers the result as a PR
+  needs: a description of what the new workflow should do, step by step (at least a sentence)
+  intake: workflow-goal
+  delivery: fixed
+
+source:
+  use: static
+  with: { jobs: [] }
+
+providers:
+  llm:
+    use: bedrock
+    with:
+      model_id: "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+      region: us-east-1
+      max_tokens: 8192
+      price_per_mtok: { input: 1.0, output: 5.0 }   # USD per 1M tokens: check current prices
+
+steps:
+  - id: init
+    use: workdir.init
+
+  # CATALOG.md is generated from the plugins installed right now, so the agent cannot rely on a stale list.
+  - id: catalog
+    use: workflow.catalog
+
+  - id: draft
+    use: agent.edit
+    with:
+      instruction: >-
+        Write the file draft.yaml: a minifactory workflow for the goal below. Read CATALOG.md (the format
+        rules and the ONLY steps, providers and parameters that exist) and EXAMPLE.yaml (a working workflow).
+        Use only what CATALOG.md lists; do not invent steps or parameters. Include a `route:` block so
+        `minifactory ask` can find it, and keep the workflow small. If the goal cannot be done with the listed
+        steps, do NOT write the file: your ENTIRE reply must be one line, `MISSING: <the step or provider that would be needed>`, with no analysis.
+        GOAL: ${job.goal}
+      files: ["CATALOG.md", "EXAMPLE.yaml"]
+      allowed_prefixes: ["draft.yaml"]
+      commit_message: "draft the workflow"
+
+  # The validator is the gate: errors go back to the agent, with the same budgets as any repair loop.
+  - id: validate
+    use: shell.run
+    with: { cmd: "${env.python} -m minifactory validate draft.yaml" }
+    on_fail: continue
+
+  - id: repair
+    use: agent.repair_build
+    when: "steps.validate.status == 'failed'"
+    with:
+      verify_cmd: "${env.python} -m minifactory validate draft.yaml"
+      files: ["draft.yaml", "CATALOG.md"]
+      context: "The file being repaired is draft.yaml, a minifactory workflow. Fix ONLY what the error says, using only what CATALOG.md lists."
+      max_attempts: 4
+      max_unproductive: 2
+
+  - id: save
+    use: workflow.save_draft

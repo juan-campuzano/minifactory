@@ -35,6 +35,8 @@ class AppSpec(BaseModel):
 
 @register("intake", "app-spec")
 class AppSpecIntake:
+    """Draft a new-app spec (name, description, features, size) from free text, using the workflow's LLM."""
+
     def build(self, request: str, llm: Any) -> Job:
         reply = llm.complete(SYSTEM, f"<request>\n{request}\n</request>")
         try:
@@ -73,6 +75,8 @@ def repo_task_job(repo: str, task: str, prefix: str = "fix") -> Job:
 
 @register("intake", "repo-task")
 class RepoTaskIntake:
+    """Extract an `owner/name` repository and a bug description from free text."""
+
     def build(self, request: str, llm: Any) -> Job:
         reply = llm.complete(REPO_TASK_SYSTEM, f"<request>\n{request}\n</request>")
         try:
@@ -100,3 +104,15 @@ class RepoTaskSource:
 
         return [repo_task_job(**RepoTask.model_validate(yaml.safe_load(f.read_text())).model_dump())
                 for f in sorted(self.path.glob("*.yaml"))]
+
+
+@register("intake", "workflow-goal")
+class WorkflowGoalIntake:
+    """Take the user's text as the goal of a new workflow (no LLM needed: the drafting agent reads it as data)."""
+
+    def build(self, request: str, llm: Any) -> Job:
+        goal = " ".join(request.split())
+        if len(goal) < 15:
+            raise ValueError("describe what the new workflow should do (at least a sentence)")
+        digest = hashlib.sha1(goal.encode()).hexdigest()[:8]
+        return Job(id=f"wf-{digest}", name=f"wf-{digest}", attrs={"goal": goal})

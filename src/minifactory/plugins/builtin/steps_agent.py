@@ -31,6 +31,8 @@ class MigrateParams(StrictParams):
 
 @register("step", "agent.llm_migrate")
 class LLMMigrate(Step):
+    """One LLM call that rewrites the listed files following an instruction (a migration), then commits."""
+
     Params = MigrateParams
     needs = ("llm",)
 
@@ -49,6 +51,7 @@ class RepairParams(StrictParams):
     files: list[str] = Field(default_factory=list)
     globs: list[str] = Field(default_factory=list)  # e.g. lib/**/*.dart, for dynamic file sets
     max_context_chars: int = 60_000
+    context: str = ""  # extra guidance shown with every error report (e.g. the rules the file must follow)
     max_attempts: int = 5
     max_unproductive: int = 2
     commit_message: str = "fix: repair build after migration"
@@ -76,7 +79,8 @@ class RepairBuild(Step):
             if rc == 0:
                 return StepResult.ok(f"green after {attempt - 1} attempt(s)", attempts=attempt - 1)
             files = collect_files(ctx.repo_dir, p.files, p.globs, p.max_context_chars)
-            prompt = (f"TASK: repair\nAPP: {ctx.job.name}\nThe build fails with:\n{out}\n\n"
+            guidance = f"{p.context}\n\n" if p.context else ""
+            prompt = (f"TASK: repair\nAPP: {ctx.job.name}\n{guidance}The build fails with:\n{out}\n\n"
                       f"{file_blocks(ctx.repo_dir, files)}")
             try:
                 edits = apply_reply(ctx.repo_dir, ctx.llm.complete(SYSTEM_PROMPT, prompt))

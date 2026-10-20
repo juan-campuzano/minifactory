@@ -86,6 +86,7 @@ Copy one into your workspace with `minifactory workflows copy NAME`; only copied
 | `flutter-app-factory` | the offline demo above | nothing |
 | `flutter-app-factory-bedrock` | creates a **new** Flutter app from a one-line request, sized to the request ("minimal" means few features) | AWS credentials (Bedrock), Flutter SDK |
 | `fix-bug` | fixes a bug in an **existing** GitHub repo: reproduces it with a failing test, fixes it minimally, opens a PR | `gh auth login`, AWS credentials, Flutter SDK |
+| `create-workflow` | drafts a **new workflow** from a plain-language goal, using only the steps and plugins that exist (see below) | AWS credentials (Bedrock) |
 | `java-migration-demo` | a batch transform over toy repos: deterministic branch vs LLM branch, baseline gate, repair loop | nothing |
 
 ## Describe what you need: `minifactory ask`
@@ -116,6 +117,21 @@ that reproduces the bug (and stops without changing anything if that test does n
 exact-match patch, re-runs the checks, enforces a size limit on the change, and opens a pull request.
 It never touches the default branch.
 
+## Let the factory write workflows
+
+```bash
+minifactory workflows copy create-workflow
+minifactory ask "create a workflow that clones a GitHub repo, runs dart format and opens a pull request"
+minifactory workflows list                    # the result is listed under "drafts"
+minifactory workflows enable dart-format-pr   # shows what it would do, asks, then activates it
+```
+
+The agent reads a catalog generated from the plugins installed *right now* (`minifactory plugins --schema` prints the same
+text), writes `draft.yaml`, and must pass the same validator as any workflow; errors go back to it through the usual repair
+loop. If the goal needs something that does not exist it declines with `MISSING: <what>` instead of inventing a step.
+The result is only ever a **draft**: it is not routable by `ask` and never runs until you enable it, and `enable` first lists
+every shell command, repository write and paid LLM call it contains.
+
 ## Design principles
 
 - **Untrusted agent output.** Edits are parsed strictly: a `PATCH` must match exactly once or nothing is written;
@@ -123,6 +139,7 @@ It never touches the default branch.
 - **Bounded loops.** Repair attempts, unproductive attempts, features per plan and context size all have budgets.
 - **Deterministic gates after every agent step.** `on_fail: discard` stops a job without changing anything;
   `blocking: false` lets enrichment steps annotate a result without stopping it.
+- **Generated workflows are drafts.** A person reviews and enables them; nothing an LLM wrote runs on its own.
 - **Proposals, not pushes.** Changes to existing repos arrive as a pull request on a new branch.
 - **No silent fakes.** The simulated `flutter` is opt-in (`tool: fake` or `FACTORY_FLUTTER=fake`); by default the
   real SDK is required and a missing one is an error.

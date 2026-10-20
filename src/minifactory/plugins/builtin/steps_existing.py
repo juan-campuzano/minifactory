@@ -27,6 +27,13 @@ from .util import (
 _WORD = re.compile(r"[a-z0-9]{3,}")
 
 
+def _what_it_said(reply: str) -> str:
+    """An explicit `MISSING: ...` line if there is one (the agreed way to decline), else the END of the
+    reply, where a refusal states its conclusion."""
+    found = re.search(r"^\s*MISSING:.*$", reply, re.MULTILINE)
+    return found.group(0).strip() if found else "..." + " ".join(reply.split())[-300:]
+
+
 class LocateParams(StrictParams):
     task: str  # the bug report or feature request
     globs: list[str] = Field(default_factory=lambda: ["*"])  # which tracked files may be chosen
@@ -87,13 +94,13 @@ class Edit(Step):
         shown = collect_files(ctx.repo_dir, [*p.files, *p.extra_files], [], p.max_context_chars)
         extra = f"\nADDITIONAL CONTEXT:\n{p.extra[-4000:]}\n" if p.extra else ""
         prompt = f"TASK: edit\nAPP: {ctx.job.name}\n{p.instruction}\n{extra}\n{file_blocks(ctx.repo_dir, shown)}"
+        reply = ctx.llm.complete(SYSTEM_PROMPT, prompt)
         try:
-            changed = apply_reply(ctx.repo_dir, ctx.llm.complete(SYSTEM_PROMPT, prompt),
-                                  p.allowed_prefixes or None)
+            changed = apply_reply(ctx.repo_dir, reply, p.allowed_prefixes or None)
         except PatchError as e:
             return StepResult.failed(str(e))
         if not changed:
-            return StepResult.failed("the LLM proposed no edits")
+            return StepResult.failed("the LLM proposed no edits: " + _what_it_said(reply))
         commit_all(ctx.repo_dir, p.commit_message)
         return StepResult.ok(f"edited {', '.join(changed)}", edited=changed)
 

@@ -61,6 +61,8 @@ class AnalyzeParams(StrictParams):
 
 @register("step", "flutter.analyze")
 class FlutterAnalyze(Step):
+    """`flutter analyze` in the repo; the step fails if it reports any issue."""
+
     Params = AnalyzeParams
 
     def run(self, ctx: StepContext, p: AnalyzeParams) -> StepResult:
