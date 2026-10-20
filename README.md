@@ -34,10 +34,25 @@ The rule that keeps it from becoming spaghetti: **the core never imports a plugi
 
 ## Install
 
+The easiest way to get the `minifactory` command is a tool installer, which keeps it isolated and on your `PATH`:
+
 ```bash
-pip install minifactory              # the engine and the CLI
-pip install "minifactory[aws]"       # + boto3, for the Amazon Bedrock LLM
+uv tool install minifactory            # or: pipx install minifactory
+uv tool install "minifactory[aws]"     # + boto3, for the Amazon Bedrock LLM
 ```
+
+Or with plain pip, ideally inside a virtual environment:
+
+```bash
+pip install minifactory
+pip install "minifactory[aws]"
+```
+
+> **`minifactory: command not found` after `pip install`?** pip puts console scripts next to the Python it installed
+> into, and that folder is often not on your `PATH` (typical with the python.org macOS installer, where it is
+> `/Library/Frameworks/Python.framework/Versions/3.X/bin`). Use `uv tool install` / `pipx`, add that folder to `PATH`,
+> or run `python3 -m minifactory ...`. Beware of zsh's `AUTO_CD`: if a folder called `minifactory` exists where you
+> are, typing the bare word changes into it instead of reporting the missing command.
 
 From source, for development:
 
