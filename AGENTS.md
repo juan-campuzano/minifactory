@@ -120,8 +120,8 @@ See `docs/plugins.md` and `examples/hello_plugin.py`. Load it with `--plugin mod
   ~14k in / 6.8k out tokens, ~$0.05 using the assumed price of $1/$5 per 1M tokens: verify). Nova Lite (plan/format errors)
   and Llama 3.3 70B (5 features, 48-177 analyze issues, repair budget exhausted) did NOT produce a green app.
   Only one app and one run per model: not a benchmark. `claude-haiku-5-5` is not enabled for the test account.
-- No real SCM (Azure DevOps/GitHub), secrets (AWS STS), source (Neptune) or executor (AWS Batch) plugins yet:
-  see the "From toy to your real codemod" table in `README.md`.
+- No plugins yet for other git hosts (only GitHub via `gh`), cross-account/STS secrets, graph or database job sources, or a remote executor
+  (e.g. AWS Batch): each is one plugin implementing an existing port (see `docs/plugins.md`).
 - `scm.init_repo` is an optional capability of the provider (not in the `SCMProvider` Protocol); only `local-git` has it.
 - Re-running the Flutter workflow when a job *failed* after `init` fails at `init` (repo exists): reset `demo-flutter/`.
 - Real `FACTORY_FLUTTER=real` runs were not exercised in tests; the Dart fixtures are plausible but unverified against the SDK.
