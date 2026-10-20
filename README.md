@@ -57,6 +57,17 @@ factory ask "quiero una app para llevar mis gastos"             # same, then ask
 
 Workflows opt in with a `route:` block (see the `flutter-app-factory-bedrock` template: `factory workflows copy flutter-app-factory-bedrock`). Details in `AGENTS.md`.
 
+## Fix a bug in an existing repo
+
+```bash
+factory workflows copy fix-bug
+factory ask "the counter goes up by 2 instead of 1 in acme/todo_app" --dry-run
+```
+
+`fix-bug` clones the repo with `gh`, writes a test that reproduces the bug (and refuses to continue if it doesn't fail),
+fixes it with a minimal edit, re-runs analyze and tests, checks the change is small, and opens a pull request.
+It never touches the default branch. Flutter/Dart only for now. Needs `gh auth login`, AWS credentials (Bedrock) and the Flutter SDK.
+
 ## Try it: the Java migration demo (transform existing repos)
 
 ```bash

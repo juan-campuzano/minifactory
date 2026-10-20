@@ -9,7 +9,17 @@ from factory.core.context import Step, StepContext, StrictParams
 from factory.core.models import StepResult
 from factory.core.registry import register
 
-from .util import SYSTEM_PROMPT, apply_edits, collect_files, commit_all, file_blocks, parse_edits, run_shell
+from .util import (
+    SYSTEM_PROMPT,
+    PatchError,
+    apply_edits,
+    apply_reply,
+    collect_files,
+    commit_all,
+    file_blocks,
+    parse_edits,
+    run_shell,
+)
 from .util import first_json_object as _first_json_object
 
 
@@ -68,9 +78,12 @@ class RepairBuild(Step):
             files = collect_files(ctx.repo_dir, p.files, p.globs, p.max_context_chars)
             prompt = (f"TASK: repair\nAPP: {ctx.job.name}\nThe build fails with:\n{out}\n\n"
                       f"{file_blocks(ctx.repo_dir, files)}")
-            edits = parse_edits(ctx.llm.complete(SYSTEM_PROMPT, prompt))
+            try:
+                edits = apply_reply(ctx.repo_dir, ctx.llm.complete(SYSTEM_PROMPT, prompt))
+            except PatchError as e:  # a patch that doesn't apply is an unproductive attempt, not a crash
+                edits = []
+                ctx.emit("repair_patch_rejected", attempt=attempt, error=str(e))
             if edits:
-                apply_edits(ctx.repo_dir, edits)
                 commit_all(ctx.repo_dir, p.commit_message)
             new_rc, new_out = run_shell(p.verify_cmd, ctx.repo_dir, p.timeout)
             progressed = bool(edits) and (new_rc == 0 or new_out != out)
@@ -182,12 +195,14 @@ class ImplementSpec(Step):
                       "Implement ONLY this feature, minimally: a few small files and a handful of focused "
                       "tests (not one test per tiny behaviour), reusing what already exists below.\n\n"
                       f"{file_blocks(ctx.repo_dir, files)}")
-            edits = parse_edits(ctx.llm.complete(SYSTEM_PROMPT, prompt))
-            if not edits:
+            try:
+                changed = apply_reply(ctx.repo_dir, ctx.llm.complete(SYSTEM_PROMPT, prompt))
+            except PatchError as e:
+                return StepResult.failed(f"feature '{feature.id}': {e}", implemented=done)
+            if not changed:
                 return StepResult.failed(f"feature '{feature.id}': LLM returned no edits",
                                          implemented=done)
-            apply_edits(ctx.repo_dir, edits)
             commit_all(ctx.repo_dir, f"feat({feature.id}): {feature.title}")
-            ctx.emit("feature_implemented", feature=feature.id, files=sorted(edits))
+            ctx.emit("feature_implemented", feature=feature.id, files=changed)
             done.append(feature.id)
         return StepResult.ok(f"implemented {', '.join(done)}", implemented=done)

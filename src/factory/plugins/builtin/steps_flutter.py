@@ -72,6 +72,8 @@ class RunTestsParams(StrictParams):
     min_coverage: float | None = None  # percent of lines; below it the step fails
     timeout: int = 600
     tool: Tool | None = None
+    paths: list[str] = []  # run only these test files
+    expect_failure: bool = False  # the 'bug is reproduced' gate: tests must fail, and for the right reason
 
 
 def _line_coverage(lcov: Path) -> float | None:
@@ -95,7 +97,19 @@ class FlutterTest(Step):
 
     def run(self, ctx: StepContext, p: RunTestsParams) -> StepResult:
         with_coverage = p.coverage or p.min_coverage is not None
-        rc, out = _run(ctx, "test --coverage" if with_coverage else "test", p.timeout, p.tool)
+        args = ("test --coverage" if with_coverage else "test") + "".join(f" {shlex.quote(x)}" for x in p.paths)
+        rc, out = _run(ctx, args, p.timeout, p.tool)
+        if p.expect_failure:
+            if rc in (124, 127):
+                return StepResult(status="failed", outputs={"rc": rc, "output": out[-4000:]},
+                                  message=f"could not run flutter: {out[-200:]}")
+            if rc == 0:
+                return StepResult(status="failed", outputs={"rc": rc, "output": out[-4000:]},
+                                  message="expected the tests to fail, but they passed")
+            if "Compilation failed" in out or "Failed to load" in out:  # red, but not because of the bug
+                return StepResult(status="failed", outputs={"rc": rc, "output": out[-4000:]},
+                                  message="the test does not compile, so it proves nothing")
+            return StepResult(outputs={"rc": rc, "output": out[-4000:]}, message="failed as expected")
         result = _result(rc, out)
         if rc != 0 or not with_coverage:
             return result

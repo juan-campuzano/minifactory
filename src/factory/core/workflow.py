@@ -47,6 +47,9 @@ class RouteSpec(BaseModel):
     examples: list[str] = Field(default_factory=list)
     needs: str = ""  # what a request must contain for this workflow to start (judged by the router)
     intake: str  # name of a registered `intake` plugin that drafts the Job from the text
+    # choose: the user picks where results go (new projects). fixed: the workflow delivers to its own target
+    # (e.g. a pull request on the repository being changed) and `--output` does not apply.
+    delivery: Literal["choose", "fixed"] = "choose"
 
 
 SCHEMA_VERSION = 1

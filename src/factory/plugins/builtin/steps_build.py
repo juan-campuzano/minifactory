@@ -13,6 +13,7 @@ from .util import run_shell, safe_path
 class ShellParams(StrictParams):
     cmd: str
     timeout: int = 120
+    expect_failure: bool = False  # for 'this test must fail first' gates; a missing tool or a timeout never counts
 
 
 @register("step", "shell.run")
@@ -22,6 +23,12 @@ class ShellRun(Step):
     def run(self, ctx: StepContext, p: ShellParams) -> StepResult:
         rc, out = run_shell(p.cmd, ctx.repo_dir, p.timeout)
         outputs = {"rc": rc, "output": out[-4000:]}
+        if p.expect_failure:
+            if rc in (124, 127):
+                return StepResult(status="failed", outputs=outputs, message=f"could not run: {out[-200:]}")
+            if rc == 0:
+                return StepResult(status="failed", outputs=outputs, message="expected a failure but the command passed")
+            return StepResult(outputs=outputs, message="failed as expected")
         if rc == 0:
             return StepResult(outputs=outputs, message="ok")
         last = out.splitlines()[-1] if out else f"exit code {rc}"

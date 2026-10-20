@@ -11,6 +11,7 @@ from . import (  # noqa: F401
     routers,
     steps_agent,
     steps_build,
+    steps_existing,
     steps_flutter,
     steps_scm,
 )

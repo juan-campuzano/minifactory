@@ -48,9 +48,11 @@ class GitHub:
         return self._owner
 
     def _full(self, repo: str) -> str:
-        return f"{self.owner}/{repo}"
+        return repo if "/" in repo else f"{self.owner}/{repo}"  # existing repos come as owner/name
 
     def target(self, repo: str) -> str:
+        if "/" in repo:
+            return f"pull request on github.com/{repo}"
         return f"github.com/{self._full(repo)} ({'private' if self.private else 'PUBLIC'})"
 
     def _exists(self, repo: str) -> bool:

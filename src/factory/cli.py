@@ -164,6 +164,20 @@ def _ask(args) -> int:
     show_spec(console, chosen.spec.name, job)
 
     output = args.output
+    if chosen.spec.route.delivery == "fixed":
+        if output:
+            raise RoutingError("this workflow delivers to the repository itself; --output does not apply")
+        bus = EventBus()
+        engine = Engine(chosen.spec, args.runs_dir, bus)
+        describe = getattr(engine.scm, "target", lambda repo: repo)  # `target` is optional on providers
+        console.print(f"[bold]delivery →[/] {describe(job.name)}")
+        if args.dry_run:
+            return 0
+        if not args.yes and (not sys.stdin.isatty() or input("Run it? [y/N] ").strip().lower() != "y"):
+            console.print("not run (confirm interactively or pass --yes)")
+            return 2
+        _execute(engine, bus, [job], args)
+        return 0
     if output is None and not args.dry_run:
         if not interactive:
             raise RoutingError("choose where the result goes: --output local|github")

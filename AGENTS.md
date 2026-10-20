@@ -59,6 +59,17 @@ To make a workflow routable: add `route:` and, if its input isn't an app spec, r
 - `examples/` (plugin example), `docs/plugins.md`, `tests/`.
 - Run artifacts: `.factory/runs/<workflow>/<job>/{state.json,result.json,work/}` and `events.jsonl`. Generated, git-ignored.
 
+## Changing existing repositories (`fix-bug` template)
+`factory ask "arregla X en owner/repo: ..."` -> router -> `repo-task` intake (needs `owner/name` literally in the text; the LLM only extracts it,
+and a repo that does not appear in the request is rejected) -> workflow `route.delivery: fixed` (no `--output`: it always opens a PR on that repo).
+Steps: guard -> clone -> baseline (`flutter.analyze`, discard if red) -> `agent.locate_files` (LLM *selects* from `git ls-files`; invented paths are
+dropped) -> `agent.edit` writes ONE repro test (`allowed_prefixes: [test/]`) -> `expect_failure` gate (a passing test, a missing SDK, a timeout or a
+compile error never count as "reproduced"; not reproduced = discarded, nothing changed) -> `agent.edit` fixes -> analyze/test -> repair -> `scm.diff_limit`
+(blast radius: 8 files / 300 lines) -> PR. The default branch is never touched.
+Edits use `util.apply_reply`: `PATCH:` blocks (exact SEARCH must match exactly once, all-or-nothing) or `FILE:` blocks (full content).
+Verified 2026-10-20 with real Haiku 4.5 + Flutter on a repo with an injected bug (`+= 2` instead of `+= 1`): repro test red, one-line fix, 4 tests green.
+Not verified: a real GitHub repo (the run used a local-git remote), big repos, bugs spanning several files, `add-feature` (not built).
+
 ## Workspace (installable layout)
 Code ships in the package; user content lives in a workspace found like git: nearest `factory.yaml` upward from the cwd, else the global
 `$XDG_CONFIG_HOME/minifactory` (default `~/.config/minifactory`), else none (then everything is relative to the cwd, as in development).
@@ -99,7 +110,9 @@ See `docs/plugins.md` and `examples/hello_plugin.py`. Load it with `--plugin mod
 - Real runs (2026-10-20, Haiku 4.5, Flutter real): a 1-line counter app succeeded and was delivered; an "expense tracker" (8 features)
   failed: features implemented independently do not agree (undefined `ExpenseItem`), repair exhausted 4 attempts, ~$0.48. Bigger apps
   need better context/ordering between features (not solved).
-- Only one intake exists (`app-spec`). Adding workflows for existing repos (fix a bug, write tests...) needs new intakes.
+- Brownfield: only Flutter/Dart (analyze/test steps are Flutter's; other stacks need their own steps or `shell.run`). The repro test lives in
+  `test/factory_repro_test.dart` and stays in the PR as a regression test.
+- Intakes: `app-spec` (new apps) and `repo-task` (bug in an existing repo). Adding workflows for existing repos (fix a bug, write tests...) needs new intakes.
 - LLM usage: providers may implement `complete_ex(system, prompt) -> (text, usage)`; only `bedrock` does (tokens + optional
   `cost_usd` from `price_per_mtok`, whose values are set by the user and must be re-checked). `openai` reports no tokens yet.
 - Real-LLM runs of the Flutter workflow (Bedrock, `FACTORY_FLUTTER=real`, `todo_app`), measured on 2026-10-20:
