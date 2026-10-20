@@ -1,4 +1,4 @@
-# Same factory, but the LLM is Amazon Bedrock. Needs `pip install -e ".[aws]"` and AWS credentials.
+# Same factory, but the LLM is Amazon Bedrock. Needs `pip install "minifactory[aws]"` and AWS credentials.
 # Use FACTORY_FLUTTER=real for the real Flutter SDK. Re-check the price_per_mtok values.
 # Creates a Flutter app from a spec: plan -> implement -> gates -> repair -> PR.
 # Run from the project root:  minifactory run workflows/flutter-app-factory.yaml

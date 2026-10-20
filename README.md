@@ -35,9 +35,16 @@ The rule that keeps it from becoming spaghetti: **the core never imports a plugi
 ## Install
 
 ```bash
+pip install minifactory              # the engine and the CLI
+pip install "minifactory[aws]"       # + boto3, for the Amazon Bedrock LLM
+```
+
+From source, for development:
+
+```bash
 git clone https://github.com/juan-campuzano/minifactory && cd minifactory
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"          # add ",aws" for the Amazon Bedrock LLM (installs boto3)
+pip install -e ".[dev,aws]"
 ```
 
 Python 3.11+. Workflows live in a **workspace**, not in the package (see below).
