@@ -171,3 +171,14 @@ def test_unknown_workflow_schema_version_is_rejected():
     assert WorkflowSpec.model_validate({**base, "schema_version": 1}).schema_version == 1
     with pytest.raises(ValueError, match="schema_version"):
         WorkflowSpec.model_validate({**base, "schema_version": 2})
+
+
+def test_package_version_matches_pyproject():
+    """Two places hold the version; the publish workflow checks the tag against pyproject."""
+    import tomllib
+
+    import factory
+
+    root = Path(__file__).parent.parent
+    declared = tomllib.loads((root / "pyproject.toml").read_text())["project"]["version"]
+    assert factory.__version__ == declared
