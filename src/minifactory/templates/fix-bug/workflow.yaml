@@ -1,0 +1,117 @@
+# Fixes a bug in an EXISTING GitHub repository (Flutter/Dart): reproduces it with a failing test, fixes it, opens a PR.
+# Never touches the default branch: the work goes to a new branch and a pull request. Needs `gh auth login`,
+# AWS credentials for Bedrock and the Flutter SDK. Costs LLM tokens.
+
+name: fix-bug
+
+route:
+  description: Fix a bug in an EXISTING GitHub repository (Flutter/Dart). Reproduces it with a failing test, fixes it and opens a pull request
+  not_for:
+    - creating a new app or project from scratch
+    - adding a new feature to an existing repository
+    - upgrading or migrating versions
+  examples:
+    - arregla el crash del login en acme/todo_app
+    - fix the null error when the list is empty in acme/todo_app
+  needs: the GitHub repository as owner/name and a description of the wrong behaviour
+  intake: repo-task
+  delivery: fixed
+
+vars:
+  max_files: 8
+  max_lines: 300
+
+source:
+  use: repo-tasks
+  with: { path: tasks }
+
+executor:
+  use: threads
+  with: { workers: 1 }
+
+providers:
+  scm:
+    use: github                 # jobs are `owner/name`; a PR is opened on the repo itself
+  llm:
+    use: bedrock
+    with:
+      model_id: "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+      region: us-east-1
+      max_tokens: 16384
+      price_per_mtok: { input: 1.0, output: 5.0 }   # USD per 1M tokens: check current prices
+
+steps:
+  - id: guard
+    use: scm.guard_no_open_pr
+    with: { branch: "${job.branch}" }
+
+  - id: clone
+    use: scm.clone
+
+  # A repo that does not even analyse cleanly cannot be judged: stop before spending anything.
+  - id: baseline
+    use: flutter.analyze
+    on_fail: discard
+
+  - id: locate
+    use: agent.locate_files
+    with:
+      task: "${job.task}"
+      globs: ["lib/*", "test/*", "pubspec.yaml"]
+
+  # 1. Prove the bug: a new test, only under test/, that fails because of it.
+  - id: repro
+    use: agent.edit
+    with:
+      instruction: >-
+        Write ONE new Flutter test file, test/factory_repro_test.dart, that reproduces this bug and
+        fails because of it (not because of a missing import or a compile error). Change no other file.
+        BUG: ${job.task}
+      files: "${steps.locate.outputs.files}"
+      allowed_prefixes: ["test/"]
+      commit_message: "test: reproduce the bug"
+
+  - id: repro_fails
+    use: flutter.test
+    with: { paths: ["test/factory_repro_test.dart"], expect_failure: true }
+    on_fail: discard            # not reproduced = nothing safe to fix: stop, change nothing
+
+  # 2. Fix it with the smallest change that makes that test pass.
+  - id: fix
+    use: agent.edit
+    with:
+      instruction: >-
+        Fix this bug with the smallest possible change to the production code. Do not edit
+        test/factory_repro_test.dart. Prefer PATCH edits. BUG: ${job.task}
+      files: "${steps.locate.outputs.files}"
+      extra_files: ["test/factory_repro_test.dart"]
+      extra: "${steps.repro_fails.outputs.output}"
+      commit_message: "fix: ${job.repo}"
+
+  - id: analyze
+    use: flutter.analyze
+    on_fail: continue
+
+  - id: test
+    use: flutter.test
+    on_fail: continue
+
+  - id: repair
+    use: agent.repair_build
+    when: "steps.analyze.status == 'failed' or steps.test.status == 'failed'"
+    with:
+      verify_cmd: "${env.python} -m minifactory.plugins.builtin.flutter_tool analyze && ${env.python} -m minifactory.plugins.builtin.flutter_tool test"
+      globs: ["lib/**/*.dart", "test/**/*.dart", "pubspec.yaml"]
+      max_attempts: 3
+      max_unproductive: 2
+
+  - id: size
+    use: scm.diff_limit
+    with: { max_files: "${vars.max_files}", max_lines: "${vars.max_lines}" }
+
+  - id: deliver
+    use: scm.open_pr
+    with:
+      branch: "${job.branch}"
+      title: "fix: automated bug fix for ${job.repo}"
+      body: "${job.task}"

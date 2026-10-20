@@ -1,7 +1,7 @@
 from rich.console import Console
 
-from factory.core.models import Artifact, JobResult
-from factory.ui import LiveBoard
+from minifactory.core.models import Artifact, JobResult
+from minifactory.ui import LiveBoard
 
 
 def feed(board, job, *statuses):

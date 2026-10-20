@@ -3,11 +3,11 @@ a step needs no change to the factory."""
 
 from pathlib import Path
 
-from factory.core import registry
-from factory.core.context import Step, StrictParams
-from factory.core.engine import Engine
-from factory.core.models import StepResult
-from factory.core.workflow import WorkflowSpec, validate_spec
+from minifactory.core import registry
+from minifactory.core.context import Step, StrictParams
+from minifactory.core.engine import Engine
+from minifactory.core.models import StepResult
+from minifactory.core.workflow import WorkflowSpec, validate_spec
 
 registry.load_plugins()
 CALLS: list[str] = []

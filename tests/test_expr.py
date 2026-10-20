@@ -1,6 +1,6 @@
 import pytest
 
-from factory.core.expr import NS, ExprError, evaluate, render
+from minifactory.core.expr import NS, ExprError, evaluate, render
 
 ENV = {
     "job": NS({"architecture": "clean", "java_current": 11}),

@@ -1,7 +1,7 @@
 import pytest
 
-from factory.core import registry
-from factory.plugins.builtin.providers_bedrock import BedrockLLM
+from minifactory.core import registry
+from minifactory.plugins.builtin.providers_bedrock import BedrockLLM
 
 registry.load_plugins()
 
@@ -56,7 +56,7 @@ def test_truncated_reply_is_rejected():
 def test_missing_boto3_is_a_clear_error_not_a_traceback(monkeypatch):
     import sys
 
-    from factory.core.errors import FactoryError
+    from minifactory.core.errors import FactoryError
 
     monkeypatch.setitem(sys.modules, "boto3", None)  # makes `import boto3` raise ImportError
     with pytest.raises(FactoryError, match=r"minifactory\[aws\]"):

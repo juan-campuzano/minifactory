@@ -6,7 +6,7 @@ Tool-specific files (CLAUDE.md, GEMINI.md...) should not exist; if one is needed
 ## What this is
 `minifactory`: a small engine that runs **declarative workflows** (YAML) made of **plugin steps** over a queue of
 **jobs**. Environment-specific things (git host, LLM, secrets, where jobs run, what to work on) sit behind **ports**.
-Packaged templates (`src/factory/templates/<name>/`): `flutter-app-factory` (offline demo: fixture LLM + fake flutter),
+Packaged templates (`src/minifactory/templates/<name>/`): `flutter-app-factory` (offline demo: fixture LLM + fake flutter),
 `flutter-app-factory-bedrock` (real: Bedrock + real Flutter; the one `ask` uses) and `java-migration-demo` (a miniature of the
 real codemod). They are copied into a workspace; the package itself never runs from its own folders.
 
@@ -16,31 +16,31 @@ pip install -e ".[dev,aws]"                       # aws = boto3, only for the be
 pytest                                              # no network, no Flutter SDK needed
 ruff check src tests examples
 mypy                                                # strict; see "Known gaps"
-factory plugins                                     # list registered plugins
-factory init my-factory && cd my-factory           # create a workspace
-factory workflows list | copy NAME                  # packaged templates -> your workspace
-factory validate flutter-app-factory                # by name (or path); fail-fast checks, runs nothing
-factory run flutter-app-factory                     # needs a clean demo-flutter/ (rm -rf demo-flutter to reset)
-factory demo-init && factory run java-migration-demo
-factory run flutter-app-factory-bedrock --only todo_app   # real LLM (Bedrock); costs tokens
-factory run ... --plain                             # no colours/live board (automatic when not a TTY)
-FACTORY_FLUTTER=fake factory run ...                # simulated flutter (tests/demo ONLY); default is the real SDK, error if missing
+minifactory plugins                                     # list registered plugins
+minifactory init my-factory && cd my-factory           # create a workspace
+minifactory workflows list | copy NAME                  # packaged templates -> your workspace
+minifactory validate flutter-app-factory                # by name (or path); fail-fast checks, runs nothing
+minifactory run flutter-app-factory                     # needs a clean demo-flutter/ (rm -rf demo-flutter to reset)
+minifactory demo-init && minifactory run java-migration-demo
+minifactory run flutter-app-factory-bedrock --only todo_app   # real LLM (Bedrock); costs tokens
+minifactory run ... --plain                             # no colours/live board (automatic when not a TTY)
+FACTORY_FLUTTER=fake minifactory run ...                # simulated flutter (tests/demo ONLY); default is the real SDK, error if missing
 ```
 
-## Free text -> workflow (`factory ask`)
-`factory ask "quiero una app para llevar mis gastos" [--dry-run] [--yes] [--threshold 0.7] [--router jev|keyword]`
+## Free text -> workflow (`minifactory ask`)
+`minifactory ask "quiero una app para llevar mis gastos" [--dry-run] [--yes] [--threshold 0.7] [--router jev|keyword]`
 1. `discover` loads the workspace's `workflows/*.yaml` (then `~/.config/minifactory/workflows`; packaged templates are NOT routable until copied) that have a `route:` block (description, not_for, examples, needs, intake). No block = not routable.
 2. A `router` plugin (`jev` = TypeSafe Jev via HTTP, needs `TYPESAFE_API_KEY`; `keyword` = offline) returns a `Decision`
    (choice or None, confidence, probabilities, actionable). For Jev, `actionable` comes from one Noul per workflow built from its
    `route.needs` (what a request must contain to start); only the chosen workflow's answer is used.
-3. Policy is in code (`src/factory/router.py: check`): `--yes` only acts when choice != none, confidence >= threshold and actionable;
+3. Policy is in code (`src/minifactory/router.py: check`): `--yes` only acts when choice != none, confidence >= threshold and actionable;
    interactively a vague-but-clear request continues to the drafted input (with a warning), and a low-confidence one lets you pick from the ranking. Nothing runs without confirmation unless `--yes`.
 4. The workflow's `intake` plugin (`app-spec`) drafts the Job with the workflow's own `llm` provider; the user text is wrapped as
    data and the result is validated (name must be `^[a-z][a-z0-9_]{1,40}$`). Fixture-LLM workflows cannot draft new specs, so only
    `flutter-app-factory-bedrock.yaml` carries a `route:`.
 To make a workflow routable: add `route:` and, if its input isn't an app spec, register a new `intake` plugin.
 
-## Where the result goes (`factory ask --output`)
+## Where the result goes (`minifactory ask --output`)
 - `--output local [--output-dir DIR]` (default dir `output`): provider `local-dir` -> plain git repo `DIR/<name>` on `main`, git-ignored build
   output removed, factory notes appended to its README. Refuses to overwrite an existing folder.
 - `--output github [--owner X] [--public]`: provider `github` (uses `gh`, so `gh auth login` is the only credential) creates a PRIVATE repo
@@ -50,17 +50,17 @@ To make a workflow routable: add `route:` and, if its input isn't an app spec, r
   `scm.delivery_kind` ("pull_request" / "folder"). `scm.target(name)` is shown before running.
 
 ## Layout
-- `src/factory/core/`: engine, workflow validation, registry, events, expression language, ports. **Never imports a plugin.**
-- `src/factory/plugins/builtin/`: `providers_*.py` (scm/llm/secrets/source/executor), `steps_*.py` (steps),
+- `src/minifactory/core/`: engine, workflow validation, registry, events, expression language, ports. **Never imports a plugin.**
+- `src/minifactory/plugins/builtin/`: `providers_*.py` (scm/llm/secrets/source/executor), `steps_*.py` (steps),
   `flutter_tool.py` + `fake_flutter.py` (flutter CLI shim and its deterministic fake), `util.py` (git, shell, edit protocol).
-- `src/factory/router.py`: discovery + confidence policy for `ask`. Plugins: `routers.py` (kind `router`), `intakes.py` (kind `intake`).
-- `src/factory/ui.py`: the pretty CLI (rich live board + summary). Only an event subscriber; `cli.py` falls back to plain sinks.
-- `src/factory/workspace.py` (find/init/config), `src/factory/templates.py` + `src/factory/templates/` (packaged workflows and their `assets/`: specs = jobs, fixtures = canned LLM replies).
+- `src/minifactory/router.py`: discovery + confidence policy for `ask`. Plugins: `routers.py` (kind `router`), `intakes.py` (kind `intake`).
+- `src/minifactory/ui.py`: the pretty CLI (rich live board + summary). Only an event subscriber; `cli.py` falls back to plain sinks.
+- `src/minifactory/workspace.py` (find/init/config), `src/minifactory/templates.py` + `src/minifactory/templates/` (packaged workflows and their `assets/`: specs = jobs, fixtures = canned LLM replies).
 - `examples/` (plugin example), `docs/plugins.md`, `tests/`.
-- Run artifacts: `.factory/runs/<workflow>/<job>/{state.json,result.json,work/}` and `events.jsonl`. Generated, git-ignored.
+- Run artifacts: `.minifactory/runs/<workflow>/<job>/{state.json,result.json,work/}` and `events.jsonl`. Generated, git-ignored.
 
 ## Changing existing repositories (`fix-bug` template)
-`factory ask "arregla X en owner/repo: ..."` -> router -> `repo-task` intake (needs `owner/name` literally in the text; the LLM only extracts it,
+`minifactory ask "arregla X en owner/repo: ..."` -> router -> `repo-task` intake (needs `owner/name` literally in the text; the LLM only extracts it,
 and a repo that does not appear in the request is rejected) -> workflow `route.delivery: fixed` (no `--output`: it always opens a PR on that repo).
 Steps: guard -> clone -> baseline (`flutter.analyze`, discard if red) -> `agent.locate_files` (LLM *selects* from `git ls-files`; invented paths are
 dropped) -> `agent.edit` writes ONE repro test (`allowed_prefixes: [test/]`) -> `expect_failure` gate (a passing test, a missing SDK, a timeout or a
@@ -71,13 +71,18 @@ Verified 2026-10-20 with real Haiku 4.5 + Flutter on a repo with an injected bug
 Not verified: a real GitHub repo (the run used a local-git remote), big repos, bugs spanning several files, `add-feature` (not built).
 
 ## Workspace (installable layout)
-Code ships in the package; user content lives in a workspace found like git: nearest `factory.yaml` upward from the cwd, else the global
+Code ships in the package; user content lives in a workspace found like git: nearest `minifactory.yaml` upward from the cwd, else the global
 `$XDG_CONFIG_HOME/minifactory` (default `~/.config/minifactory`), else none (then everything is relative to the cwd, as in development).
-`factory.yaml` keys (all optional, `extra=forbid`, `schema_version: 1`): `workflows_dir runs_dir output_dir router threshold plugins`.
-Precedence: CLI flag > factory.yaml > default. When a workspace is found the CLI `chdir`s to its root, so **relative paths inside a
+`minifactory.yaml` keys (all optional, `extra=forbid`, `schema_version: 1`): `workflows_dir runs_dir output_dir router threshold plugins`.
+Precedence: CLI flag > minifactory.yaml > default. When a workspace is found the CLI `chdir`s to its root, so **relative paths inside a
 workflow resolve from the workspace root**; a file path given on the command line is made absolute first. Workflows also carry
-`schema_version` (only 1 exists). `factory workflows copy` skips identical existing files and refuses to overwrite ones you edited.
+`schema_version` (only 1 exists). `minifactory workflows copy` skips identical existing files and refuses to overwrite ones you edited.
 `run_shell` adds `src/` to `PYTHONPATH` only for a source checkout.
+
+## Naming
+Package, import name and command are all `minifactory` (the bare name `factory` is factory_boy's import name: never reuse it). Workspace file
+`minifactory.yaml`, runs folder `.minifactory/`, entry-point group `minifactory.plugins`. Kept on purpose: env var `FACTORY_FLUTTER`, the
+`factory/<name>` branch prefix on delivered work, and the `factory` git author of automated commits.
 
 ## Hard rules
 1. The core never imports a plugin. Plugins register with `@register(kind, name)`; kinds: `step source executor scm llm secrets`.
@@ -92,12 +97,12 @@ workflow resolve from the workspace root**; a file path given on the command lin
 ## Python standards (new and changed code)
 - Full type hints; `mypy --strict`-clean; pydantic models for any data crossing a step boundary.
 - No bare `except`, no `print` outside `cli.py` (use `ctx.emit` events), `pathlib` over `os.path`.
-- Shell only through `util.run_shell` (it sets `PYTHONPATH` so `python -m factory...` works from step commands).
+- Shell only through `util.run_shell` (it sets `PYTHONPATH` so `python -m minifactory...` works from step commands).
 - Small, surgical diffs: don't reformat or "improve" code you weren't asked to touch; mention unrelated issues instead.
 - Every new plugin ships with a test; every bug fix ships with a test that failed before.
 
 ## Adding a plugin
-See `docs/plugins.md` and `examples/hello_plugin.py`. Load it with `--plugin module` or the `factory.plugins` entry point.
+See `docs/plugins.md` and `examples/hello_plugin.py`. Load it with `--plugin module` or the `minifactory.plugins` entry point.
 
 ## Known gaps / not done
 - Open-source readiness: MIT LICENSE (holder "Juan Campuzano", inferred from the account name: confirm). CI (`.github/workflows/ci.yml`)

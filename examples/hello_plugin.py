@@ -1,7 +1,7 @@
 """The smallest useful plugin: one step. No core changes, no registration list to edit.
 
-    factory plugins --plugin hello_plugin          # it shows up under `step`
-    factory run my-workflow.yaml --plugin hello_plugin
+    minifactory plugins --plugin hello_plugin          # it shows up under `step`
+    minifactory run my-workflow.yaml --plugin hello_plugin
 
 (put examples/ on PYTHONPATH, or `cd examples`). In a workflow:
 
@@ -10,9 +10,9 @@
       with: { message: "hi" }
 """
 
-from factory.core.context import Step, StepContext, StrictParams
-from factory.core.models import StepResult
-from factory.core.registry import register
+from minifactory.core.context import Step, StepContext, StrictParams
+from minifactory.core.models import StepResult
+from minifactory.core.registry import register
 
 
 class Params(StrictParams):  # unknown or misspelled keys in the YAML fail at load time

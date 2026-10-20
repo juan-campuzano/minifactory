@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from factory import cli, templates, workspace
-from factory import router as R
-from factory.cli import main
-from factory.core import registry
-from factory.core.errors import FactoryError, RoutingError
-from factory.core.workflow import WorkflowSpec, load_workflow
+from minifactory import cli, templates, workspace
+from minifactory import router as R
+from minifactory.cli import main
+from minifactory.core import registry
+from minifactory.core.errors import FactoryError, RoutingError
+from minifactory.core.workflow import WorkflowSpec, load_workflow
 
 registry.load_plugins()
 
@@ -26,7 +26,7 @@ def make_workspace(root: Path, **config) -> Path:
     workspace.init(root)
     if config:
         lines = "\n".join(f"{k}: {v}" for k, v in config.items())
-        (root / "factory.yaml").write_text(f"schema_version: 1\n{lines}\n")
+        (root / "minifactory.yaml").write_text(f"schema_version: 1\n{lines}\n")
     return root
 
 
@@ -50,7 +50,7 @@ def test_no_workspace_anywhere(tmp_path):
 
 
 def test_unknown_config_key_is_an_error(tmp_path):
-    (tmp_path / "factory.yaml").write_text("workflow_dir: typo\n")
+    (tmp_path / "minifactory.yaml").write_text("workflow_dir: typo\n")
     with pytest.raises(workspace.ConfigError, match="workflow_dir"):
         workspace.load(tmp_path)
 
@@ -58,8 +58,8 @@ def test_unknown_config_key_is_an_error(tmp_path):
 # -- init ------------------------------------------------------------------------------------
 def test_init_is_idempotent_and_never_overwrites(tmp_path):
     root = tmp_path / "proj"
-    assert set(workspace.init(root)) == {"factory.yaml", ".gitignore"}
-    (root / "factory.yaml").write_text("schema_version: 1\nthreshold: 0.9\n")
+    assert set(workspace.init(root)) == {"minifactory.yaml", ".gitignore"}
+    (root / "minifactory.yaml").write_text("schema_version: 1\nthreshold: 0.9\n")
     assert workspace.init(root) == []
     assert workspace.load(root).config.threshold == 0.9
     assert (root / "workflows").is_dir()
@@ -70,7 +70,7 @@ def test_init_command_with_a_template(tmp_path, capsys):
     assert (tmp_path / "p" / "workflows" / "java-migration-demo.yaml").is_file()
 
 
-# -- options: flag > factory.yaml > default ---------------------------------------------------
+# -- options: flag > minifactory.yaml > default ---------------------------------------------------
 def parse(*argv):
     return cli._parser().parse_args(list(argv))
 
@@ -88,7 +88,7 @@ def test_config_fills_unset_options_and_flags_win(tmp_path):
 def test_without_a_workspace_defaults_apply_and_cwd_is_untouched(tmp_path):
     args = parse("ask", "hi")
     assert cli._use_workspace(args) is None
-    assert (args.router, args.threshold, args.runs_dir) == ("jev", 0.7, ".factory/runs")
+    assert (args.router, args.threshold, args.runs_dir) == ("jev", 0.7, ".minifactory/runs")
     assert Path.cwd() == tmp_path.resolve()
 
 
@@ -124,7 +124,7 @@ def test_project_workflows_win_over_global_ones_by_name(tmp_path):
 
 def test_packaged_templates_are_not_routable_until_copied(tmp_path):
     root = make_workspace(tmp_path / "proj")
-    with pytest.raises(RoutingError, match="factory workflows copy"):
+    with pytest.raises(RoutingError, match="minifactory workflows copy"):
         R.discover(workspace.find(root).workflow_dirs)
     templates.copy("flutter-app-factory-bedrock", root)
     assert "flutter-app-factory-bedrock" in R.discover(workspace.find(root).workflow_dirs)
@@ -162,7 +162,7 @@ def test_copy_is_idempotent_shares_assets_but_never_overwrites_your_edits(tmp_pa
 
 def test_workflows_copy_needs_a_workspace(tmp_path, capsys):
     assert main(["workflows", "copy", "flutter-app-factory"]) == 2
-    assert "factory init" in capsys.readouterr().err
+    assert "minifactory init" in capsys.readouterr().err
 
 
 # -- schema version --------------------------------------------------------------------------
@@ -177,8 +177,19 @@ def test_package_version_matches_pyproject():
     """Two places hold the version; the publish workflow checks the tag against pyproject."""
     import tomllib
 
-    import factory
+    import minifactory
 
     root = Path(__file__).parent.parent
     declared = tomllib.loads((root / "pyproject.toml").read_text())["project"]["version"]
-    assert factory.__version__ == declared
+    assert minifactory.__version__ == declared
+
+
+def test_the_console_script_is_named_after_the_package_and_nothing_claims_the_bare_name_factory():
+    """`factory` is also the import name of factory_boy: we must not install over it or its command."""
+    import tomllib
+
+    root = Path(__file__).parent.parent
+    meta = tomllib.loads((root / "pyproject.toml").read_text())
+    assert meta["project"]["scripts"] == {"minifactory": "minifactory.cli:main"}
+    assert not (root / "src" / "factory").exists()
+    assert list((root / "src").glob("*/__init__.py")) == [root / "src" / "minifactory" / "__init__.py"]

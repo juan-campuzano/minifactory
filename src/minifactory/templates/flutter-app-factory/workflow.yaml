@@ -1,0 +1,80 @@
+# Creates a Flutter app from a spec: plan -> implement -> gates -> repair -> PR.
+# Run from the project root:  minifactory run workflows/flutter-app-factory.yaml
+# DEMO: uses a simulated `flutter` (tool: fake) and canned LLM replies: no SDK, no tokens, and the
+# generated projects are NOT real Flutter projects. For real output use flutter-app-factory-bedrock.yaml.
+
+name: flutter-app-factory
+
+vars:
+  min_coverage: 80
+
+# What to build: one job per spec in specs/ (the "queue of app ideas").
+source:
+  use: app-specs
+  with: { path: specs }
+
+executor:
+  use: threads
+  with: { workers: 2 }
+
+providers:
+  scm:
+    use: local-git              # later: azure-devops, github
+    with: { remotes_dir: demo-flutter/remote, prs_dir: demo-flutter/prs }
+  llm:
+    use: fixture                # later: openai (your LiteLLM gateway)
+    with: { path: fixtures/flutter }
+
+steps:
+  # Dedupe: an app that already has its branch is not rebuilt.
+  - id: guard
+    use: scm.guard_no_open_pr
+    with: { branch: "factory/${job.name}" }
+
+  - id: init
+    use: scm.init_repo
+
+  - id: create
+    use: flutter.create
+    with: { tool: fake }
+
+  # The LLM plans first; the plan is validated, so a vague spec fails here and cheaply.
+  - id: plan
+    use: agent.plan_app
+
+  - id: implement
+    use: agent.implement_spec
+    with: { features: "${steps.plan.outputs.features}" }
+
+  # Deterministic gates. Red is not fatal yet: the repair loop gets a chance.
+  - id: analyze
+    use: flutter.analyze
+    with: { tool: fake }
+    on_fail: continue
+
+  - id: test
+    use: flutter.test
+    with: { tool: fake }
+    on_fail: continue
+
+  - id: repair
+    use: agent.repair_build
+    when: "steps.analyze.status == 'failed' or steps.test.status == 'failed'"
+    with:
+      verify_cmd: "${env.python} -m minifactory.plugins.builtin.flutter_tool --tool fake analyze && ${env.python} -m minifactory.plugins.builtin.flutter_tool --tool fake test"
+      globs: ["lib/**/*.dart", "test/**/*.dart"]
+      max_attempts: 4
+      max_unproductive: 2
+
+  # Never blocks the PR; a miss is written into its description.
+  - id: coverage
+    use: flutter.test
+    blocking: false
+    with: { min_coverage: "${vars.min_coverage}", tool: fake }
+
+  - id: deliver
+    use: scm.open_pr
+    with:
+      branch: "factory/${job.name}"
+      title: "feat: ${job.name} (generated)"
+      body: "${job.description}"

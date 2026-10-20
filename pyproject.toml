@@ -30,17 +30,17 @@ aws = ["boto3"]
 dev = ["pytest", "ruff", "mypy", "types-PyYAML"]
 
 [project.scripts]
-factory = "factory.cli:main"
+minifactory = "minifactory.cli:main"
 
 # Third-party packages add themselves like this (no change to the core):
-# [project.entry-points."factory.plugins"]
+# [project.entry-points."minifactory.plugins"]
 # my_plugin = "my_package.factory_plugin"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-factory = ["py.typed", "templates/**/*"]
+minifactory = ["py.typed", "templates/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,7 +1,7 @@
 __pycache__/
 *.egg-info/
 .pytest_cache/
-.factory/
+.minifactory/
 demo/
 .venv/
 demo-flutter/

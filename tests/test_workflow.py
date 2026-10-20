@@ -1,8 +1,8 @@
 import pytest
 
-from factory.core import registry
-from factory.core.errors import PluginNotFound, WorkflowError
-from factory.core.workflow import WorkflowSpec, validate_spec
+from minifactory.core import registry
+from minifactory.core.errors import PluginNotFound, WorkflowError
+from minifactory.core.workflow import WorkflowSpec, validate_spec
 
 registry.load_plugins()
 

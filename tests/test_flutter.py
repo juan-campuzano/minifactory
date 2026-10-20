@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from factory import templates, workspace
-from factory.core import registry
-from factory.core.engine import Engine
-from factory.core.workflow import load_workflow
-from factory.plugins.builtin import fake_flutter
-from factory.plugins.builtin.util import collect_files
+from minifactory import templates, workspace
+from minifactory.core import registry
+from minifactory.core.engine import Engine
+from minifactory.core.workflow import load_workflow
+from minifactory.plugins.builtin import fake_flutter
+from minifactory.plugins.builtin.util import collect_files
 
 registry.load_plugins()
 
@@ -77,7 +77,7 @@ def test_collect_files_respects_budget_and_stays_inside_repo(tmp_path):
 
 
 def test_plan_parsing_tolerates_prose_around_json():
-    from factory.plugins.builtin.steps_agent import _first_json_object
+    from minifactory.plugins.builtin.steps_agent import _first_json_object
 
     reply = 'Sure! Here you go:\n```json\n{"features": [{"id": "a"}]}\n```\nHope it helps {not json}'
     assert _first_json_object(reply) == {"features": [{"id": "a"}]}
@@ -86,30 +86,30 @@ def test_plan_parsing_tolerates_prose_around_json():
 
 
 def test_parse_edits_strips_one_enclosing_code_fence():
-    from factory.plugins.builtin.util import parse_edits
+    from minifactory.plugins.builtin.util import parse_edits
 
     reply = "FILE: lib/a.dart\n```dart\nvoid main() {}\n```\nEND_FILE\nFILE: b.txt\nplain\nEND_FILE"
     assert parse_edits(reply) == {"lib/a.dart": "void main() {}", "b.txt": "plain"}
 
 
 def test_flutter_defaults_to_the_real_sdk_and_never_silently_falls_back_to_the_fake(monkeypatch, tmp_path):
-    from factory.plugins.builtin import flutter_tool
+    from minifactory.plugins.builtin import flutter_tool
 
     monkeypatch.delenv("FACTORY_FLUTTER", raising=False)
     monkeypatch.setenv("PATH", str(tmp_path))  # no flutter anywhere
     with pytest.raises(FileNotFoundError, match="not on PATH"):
         flutter_tool.command()
-    assert flutter_tool.command("fake")[-1] == "factory.plugins.builtin.fake_flutter"
+    assert flutter_tool.command("fake")[-1] == "minifactory.plugins.builtin.fake_flutter"
     monkeypatch.setenv("FACTORY_FLUTTER", "fake")
-    assert flutter_tool.command()[-1] == "factory.plugins.builtin.fake_flutter"
+    assert flutter_tool.command()[-1] == "minifactory.plugins.builtin.fake_flutter"
     with pytest.raises(ValueError, match="unknown flutter tool"):
         flutter_tool.command("nope")
 
 
 def test_flutter_step_without_the_sdk_fails_with_a_clear_message(monkeypatch, tmp_path):
-    from factory.core.context import StepContext
-    from factory.core.models import Job
-    from factory.plugins.builtin.steps_flutter import FlutterAnalyze
+    from minifactory.core.context import StepContext
+    from minifactory.core.models import Job
+    from minifactory.plugins.builtin.steps_flutter import FlutterAnalyze
 
     monkeypatch.delenv("FACTORY_FLUTTER", raising=False)
     monkeypatch.setenv("PATH", "/usr/bin:/bin")
@@ -136,9 +136,9 @@ def plan_of(n):
 
 
 def run_plan(llm, **attrs):
-    from factory.core.context import StepContext
-    from factory.core.models import Job
-    from factory.plugins.builtin.steps_agent import PlanApp
+    from minifactory.core.context import StepContext
+    from minifactory.core.models import Job
+    from minifactory.plugins.builtin.steps_agent import PlanApp
 
     ctx = StepContext(job=Job(id="a", name="a", attrs={"description": "d", **attrs}), work_dir=Path("."),
                       scm=None, llm=llm, secrets=None, emit=lambda *a, **k: None)

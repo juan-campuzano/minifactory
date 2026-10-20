@@ -1,0 +1,86 @@
+# A miniature version of the codemod worker flow, expressed as data.
+# Run from the project root:  minifactory demo-init && minifactory run workflows/java-migration-demo.yaml
+
+name: java-migration-demo
+
+vars:
+  target_java: "21"
+
+# What to work on (stand-in for the Neptune query "repos below the Java target").
+source:
+  use: catalog
+  with: { path: demo/catalog.json, below: 21 }
+
+# Where jobs run (stand-in for AWS Batch). Swap to `local` for sequential runs.
+executor:
+  use: threads
+  with: { workers: 3 }
+
+# Environment-specific things live behind ports. Swap these to change the world.
+providers:
+  scm:
+    use: local-git              # later: azure-devops, github
+    with: { remotes_dir: demo/remote, prs_dir: demo/prs }
+  llm:
+    use: scripted               # later: openai (your LiteLLM gateway)
+  secrets:
+    use: env                    # later: aws-sts-secrets (cross-account assume-role)
+
+steps:
+  # Dedupe: skip repos that already have the branch / an open PR.
+  - id: guard
+    use: scm.guard_no_open_pr
+    with: { branch: "factory/java-${vars.target_java}" }
+
+  - id: clone
+    use: scm.clone
+
+  # Gate: a red baseline means we can't trust any result, so discard the job.
+  - id: baseline
+    use: shell.run
+    with: { cmd: "${env.python} check.py" }
+    on_fail: discard
+
+  # Transform, branch A: deterministic scaffold upgrade (Clean Architecture repos).
+  - id: scaffold
+    use: file.set_key
+    when: "job.architecture == 'clean'"
+    with: { file: build.cfg, key: java_version, value: "${vars.target_java}" }
+
+  # Transform, branch B: LLM migration (everything else).
+  - id: llm_migrate
+    use: agent.llm_migrate
+    when: "job.architecture != 'clean'"
+    with:
+      instruction: "Migrate to Java. TARGET java_version=${vars.target_java}"
+      files: [build.cfg]
+      commit_message: "chore: migrate to java ${vars.target_java}"
+
+  # Verify. A red build is not fatal yet: the repair step gets a chance.
+  - id: build
+    use: shell.run
+    with: { cmd: "${env.python} check.py" }
+    on_fail: continue
+
+  # Agentic repair loop with anti-loop budgets. Only runs if the build is red.
+  - id: repair
+    use: agent.repair_build
+    when: "steps.build.status == 'failed'"
+    with:
+      verify_cmd: "${env.python} check.py"
+      files: [build.cfg]
+      max_attempts: 4
+      max_unproductive: 2
+
+  # Non-blocking enrichment: never stops the PR, only annotates its description.
+  - id: coverage
+    use: shell.run
+    blocking: false
+    with: { cmd: "${env.python} check.py --coverage" }
+
+  - id: deliver
+    use: scm.open_pr
+    with:
+      branch: "factory/java-${vars.target_java}"
+      title: "chore: migrate ${job.name} to Java ${vars.target_java}"
+      body: "Automated migration by minifactory."

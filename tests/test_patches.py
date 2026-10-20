@@ -2,7 +2,7 @@
 
 import pytest
 
-from factory.plugins.builtin.util import PatchError, apply_patches, apply_reply, parse_patches
+from minifactory.plugins.builtin.util import PatchError, apply_patches, apply_reply, parse_patches
 
 
 def reply(path, search, replace):

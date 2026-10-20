@@ -6,14 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from factory import router as R
-from factory.core import registry
-from factory.core.errors import RoutingError
-from factory.core.workflow import WorkflowSpec
-from factory.plugins.builtin.providers_github import GitHub
-from factory.plugins.builtin.providers_scm import LocalDir
-from factory.plugins.builtin.steps_agent import MAX_FEATURES, AppPlan
-from factory.plugins.builtin.util import git
+from minifactory import router as R
+from minifactory.core import registry
+from minifactory.core.errors import RoutingError
+from minifactory.core.workflow import WorkflowSpec
+from minifactory.plugins.builtin.providers_github import GitHub
+from minifactory.plugins.builtin.providers_scm import LocalDir
+from minifactory.plugins.builtin.steps_agent import MAX_FEATURES, AppPlan
+from minifactory.plugins.builtin.util import git
 
 registry.load_plugins()
 

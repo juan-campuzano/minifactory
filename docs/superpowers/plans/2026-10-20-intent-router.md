@@ -1,10 +1,10 @@
-# Intent Router (`factory ask`) Implementation Plan
+# Intent Router (`minifactory ask`) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:executing-plans (native execution chosen by the user: "si implementa").
 
-**Goal:** `factory ask "<free text>"` picks the right workflow (Jev), drafts the job input (LLM), confirms, then runs it.
+**Goal:** `minifactory ask "<free text>"` picks the right workflow (Jev), drafts the job input (LLM), confirms, then runs it.
 
-**Architecture:** workflows declare an optional `route:` block; two new plugin kinds, `router` (jev, keyword) and `intake` (app-spec); a CLI-level orchestrator (`src/factory/router.py`) discovers candidates, applies a confidence policy in code and runs the chosen workflow's engine on the drafted `Job`.
+**Architecture:** workflows declare an optional `route:` block; two new plugin kinds, `router` (jev, keyword) and `intake` (app-spec); a CLI-level orchestrator (`src/minifactory/router.py`) discovers candidates, applies a confidence policy in code and runs the chosen workflow's engine on the drafted `Job`.
 
 **Tech Stack:** Python, pydantic, urllib (Jev HTTP API, no new dependency), existing registry/engine.
 
@@ -31,8 +31,8 @@ Produces: `Candidate`, `Decision` models; `Router.choose(request, candidates) ->
 Files: `plugins/builtin/routers.py`, `plugins/builtin/intakes.py`; tests `tests/test_router.py`, `tests/test_jev.py`.
 Produces: `JevRouter(secrets=None, model="jev-latest", transport=None)`, `KeywordRouter()`, `AppSpecIntake()`.
 
-### Task 3: Orchestrator + `factory ask`
-Files: `src/factory/router.py` (`discover`, `decide`, `ask`), `cli.py`; test `tests/test_ask.py`.
+### Task 3: Orchestrator + `minifactory ask`
+Files: `src/minifactory/router.py` (`discover`, `decide`, `ask`), `cli.py`; test `tests/test_ask.py`.
 
 ### Task 4: Docs and real route metadata
 `workflows/flutter-app-factory-bedrock.yaml` gets `route:`; `AGENTS.md`, `docs/plugins.md`, `README.md`.

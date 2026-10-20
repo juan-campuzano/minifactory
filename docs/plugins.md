@@ -1,7 +1,7 @@
 # Writing plugins
 
 A plugin is a Python class registered under a **kind** and a **name**. Nothing else to edit.
-Load it with `factory run wf.yaml --plugin my_module`, or ship a package exposing the `factory.plugins`
+Load it with `minifactory run wf.yaml --plugin my_module`, or ship a package exposing the `minifactory.plugins`
 entry point (see `pyproject.toml`).
 
 | kind | you implement | used from YAML as |
@@ -12,7 +12,7 @@ entry point (see `pyproject.toml`).
 | `secrets` | `get(name) -> str` | `providers.secrets.use` |
 | `source` | `jobs() -> list[Job]` | `source.use` |
 | `executor` | `run(jobs, fn) -> list[JobResult]` | `executor.use` |
-| `router` | `choose(request, candidates) -> Decision` | `factory ask --router NAME` |
+| `router` | `choose(request, candidates) -> Decision` | `minifactory ask --router NAME` |
 | `intake` | `build(request, llm) -> Job` | `route.intake` in a workflow |
 
 Constructor arguments of providers/sources/executors come from the `with:` block. A provider whose `__init__`

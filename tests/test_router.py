@@ -1,20 +1,20 @@
 """Intent routing: `route:` metadata, routers (keyword, Jev), the app-spec intake, the policy
-and `factory ask` end to end. No network: Jev is exercised through an injected transport."""
+and `minifactory ask` end to end. No network: Jev is exercised through an injected transport."""
 
 import json
 import urllib.error
 
 import pytest
 
-from factory import router as R
-from factory.cli import main
-from factory.core import registry
-from factory.core.context import Step, StrictParams
-from factory.core.errors import RoutingError
-from factory.core.models import Candidate, Decision, StepResult
-from factory.core.workflow import WorkflowSpec, validate_spec
-from factory.plugins.builtin.intakes import AppSpecIntake
-from factory.plugins.builtin.routers import JevRouter, KeywordRouter
+from minifactory import router as R
+from minifactory.cli import main
+from minifactory.core import registry
+from minifactory.core.context import Step, StrictParams
+from minifactory.core.errors import RoutingError
+from minifactory.core.models import Candidate, Decision, StepResult
+from minifactory.core.workflow import WorkflowSpec, validate_spec
+from minifactory.plugins.builtin.intakes import AppSpecIntake
+from minifactory.plugins.builtin.routers import JevRouter, KeywordRouter
 
 registry.load_plugins()
 RAN: list[str] = []
@@ -32,7 +32,7 @@ class Mark(Step):
 @registry.register("intake", "t.echo")
 class EchoIntake:
     def build(self, request, llm):
-        from factory.core.models import Job
+        from minifactory.core.models import Job
 
         return Job(id="job1", name="job1", attrs={"description": request})
 
@@ -203,7 +203,7 @@ def test_app_spec_intake_rejects_bad_drafts(reply):
         AppSpecIntake().build("an app", LLM(reply))
 
 
-# -- factory ask -----------------------------------------------------------------------------
+# -- minifactory ask -----------------------------------------------------------------------------
 def ask(wf_dir, *extra, request="create a new mobile app from an idea", output=True):
     where = ["--output", "local", "--output-dir", str(wf_dir.parent / "out")] if output else []
     return main(["ask", request, "--workflows-dir", str(wf_dir), "--router", "keyword",
@@ -237,7 +237,7 @@ def test_ask_yes_refuses_when_nothing_fits(wf_dir, capsys):
 def test_http_providers_use_a_tls_context_with_root_certificates():
     import ssl
 
-    from factory.plugins.builtin.util import ssl_context
+    from minifactory.plugins.builtin.util import ssl_context
 
     ctx = ssl_context()
     assert isinstance(ctx, ssl.SSLContext) and ctx.cert_store_stats()["x509_ca"] > 0
