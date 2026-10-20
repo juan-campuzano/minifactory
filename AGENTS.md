@@ -89,8 +89,9 @@ workflow resolve from the workspace root**; a file path given on the command lin
 See `docs/plugins.md` and `examples/hello_plugin.py`. Load it with `--plugin module` or the `factory.plugins` entry point.
 
 ## Known gaps / not done
-- Open-source readiness: MIT LICENSE added (holder "Juan Campuzano", inferred from the account name: confirm). `.github/workflows/ci.yml` (py3.11 + 3.13) has never run; locally only
-  Python 3.14 was exercised, so 3.11 compatibility is unverified. `minifactory` was free on PyPI on 2026-10-20 (HTTP 404), not reserved.
+- Open-source readiness: MIT LICENSE (holder "Juan Campuzano", inferred from the account name: confirm). CI (`.github/workflows/ci.yml`)
+  passes on Python 3.11 and 3.13 (first run 2026-10-20). `minifactory` was free on PyPI on 2026-10-20 (HTTP 404) but is NOT reserved:
+  publishing needs a PyPI account and token (or Trusted Publishing), which the factory does not have.
 - `jev` router has only been tested with an injected transport (request shape follows docs.typesafe.ai/api, 2026-10-20); no live
   call yet. The 0.7 threshold is a starting value to calibrate on real requests. Jev cost/latency not measured.
 - `github` provider verified only against a fake `gh` (tests); it has NOT been run against real GitHub. Creating the first real repo
