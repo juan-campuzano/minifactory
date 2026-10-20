@@ -1,0 +1,8 @@
+FILE: lib/notes.dart
+class Notes {
+  final List<String> _items = [];
+
+  void add(String text) => _items.add(text);
+  List<String> get all => List.unmodifiable(_items);
+}
+END_FILE

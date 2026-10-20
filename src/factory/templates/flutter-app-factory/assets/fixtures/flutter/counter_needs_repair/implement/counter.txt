@@ -1,0 +1,42 @@
+FILE: lib/main.dart
+import 'package:flutter/material.dart';
+
+void main() => runApp(const CounterApp());
+
+class CounterApp extends StatefulWidget {
+  const CounterApp({super.key});
+
+  @override
+  State<CounterApp> createState() => _CounterAppState();
+}
+
+class _CounterAppState extends State<CounterApp> {
+  int count = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        body: Center(child: Text('$count')),
+        floatingActionButton: FlatButton(
+          onPressed: () => setState(() => count++),
+          child: const Text('+'),
+        ),
+      ),
+    );
+  }
+}
+END_FILE
+FILE: test/widget_test.dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:counter_needs_repair/main.dart';
+
+void main() {
+  testWidgets('increments', (tester) async {
+    await tester.pumpWidget(const CounterApp());
+    await tester.tap(find.text('+'));
+    await tester.pump();
+    expect(find.text('1'), findsOneWidget);
+  });
+}
+END_FILE

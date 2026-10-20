@@ -1,0 +1,3 @@
+{"features": [
+  {"id": "counter", "title": "Counter screen", "files": ["lib/main.dart", "test/widget_test.dart"]}
+]}

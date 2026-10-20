@@ -1,0 +1,4 @@
+{"features": [
+  {"id": "model", "title": "Todo model", "files": ["lib/todo.dart", "test/todo_test.dart"]},
+  {"id": "list_screen", "title": "Todo list screen", "files": ["lib/main.dart", "test/widget_test.dart"]}
+]}

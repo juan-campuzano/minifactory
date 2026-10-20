@@ -1,0 +1,25 @@
+FILE: lib/main.dart
+import 'package:flutter/material.dart';
+
+void main() => runApp(const NotesApp());
+
+class NotesApp extends StatelessWidget {
+  const NotesApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(home: Scaffold(body: Center(child: Text('No notes yet'))));
+  }
+}
+END_FILE
+FILE: test/widget_test.dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:notes_low_coverage/main.dart';
+
+void main() {
+  testWidgets('empty state', (tester) async {
+    await tester.pumpWidget(const NotesApp());
+    expect(find.text('No notes yet'), findsOneWidget);
+  });
+}
+END_FILE

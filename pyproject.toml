@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "minifactory"
+version = "0.1.0"
+description = "A tiny, pluggable software factory: declarative workflows made of plugin steps"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = ["pydantic>=2", "pyyaml>=6", "rich>=13", "certifi"]
+
+[project.optional-dependencies]
+aws = ["boto3"]
+dev = ["pytest", "ruff", "mypy", "types-PyYAML"]
+
+[project.scripts]
+factory = "factory.cli:main"
+
+# Third-party packages add themselves like this (no change to the core):
+# [project.entry-points."factory.plugins"]
+# my_plugin = "my_package.factory_plugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+factory = ["py.typed", "templates/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+# UP035/UP037/B905 are ignored only because the pre-existing core predates them.
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = ["UP035", "UP037", "B905"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src"]
+plugins = ["pydantic.mypy"]

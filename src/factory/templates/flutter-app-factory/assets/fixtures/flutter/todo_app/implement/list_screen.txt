@@ -1,0 +1,35 @@
+FILE: lib/main.dart
+import 'package:flutter/material.dart';
+
+import 'todo.dart';
+
+void main() => runApp(const TodoApp());
+
+class TodoApp extends StatelessWidget {
+  const TodoApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final todos = [Todo('Write spec'), Todo('Ship app')];
+    return MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(title: const Text('Todos')),
+        body: ListView(
+          children: [for (final t in todos) ListTile(title: Text(t.title))],
+        ),
+      ),
+    );
+  }
+}
+END_FILE
+FILE: test/widget_test.dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:todo_app/main.dart';
+
+void main() {
+  testWidgets('shows todos', (tester) async {
+    await tester.pumpWidget(const TodoApp());
+    expect(find.text('Write spec'), findsOneWidget);
+  });
+}
+END_FILE

@@ -1,0 +1,4 @@
+{"features": [
+  {"id": "storage", "title": "Notes storage", "files": ["lib/notes.dart"]},
+  {"id": "screen", "title": "Notes screen", "files": ["lib/main.dart", "test/widget_test.dart"]}
+]}

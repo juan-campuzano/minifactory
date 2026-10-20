@@ -1,0 +1,5 @@
+name: notes_low_coverage
+description: A notes app whose generated tests miss one file, so the non-blocking coverage phase annotates the PR.
+features:
+  - notes storage
+  - notes screen

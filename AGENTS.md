@@ -1,0 +1,125 @@
+# AGENTS.md
+
+Single source of truth for any AI coding agent (Claude Code, Codex, Gemini CLI, Cursor, Copilot...).
+Tool-specific files (CLAUDE.md, GEMINI.md...) should not exist; if one is needed, make it a one-line pointer here.
+
+## What this is
+`minifactory`: a small engine that runs **declarative workflows** (YAML) made of **plugin steps** over a queue of
+**jobs**. Environment-specific things (git host, LLM, secrets, where jobs run, what to work on) sit behind **ports**.
+Packaged templates (`src/factory/templates/<name>/`): `flutter-app-factory` (offline demo: fixture LLM + fake flutter),
+`flutter-app-factory-bedrock` (real: Bedrock + real Flutter; the one `ask` uses) and `java-migration-demo` (a miniature of the
+real codemod). They are copied into a workspace; the package itself never runs from its own folders.
+
+## Commands
+```bash
+pip install -e ".[dev,aws]"                       # aws = boto3, only for the bedrock LLM
+pytest                                              # no network, no Flutter SDK needed
+ruff check src tests examples
+mypy                                                # strict; see "Known gaps"
+factory plugins                                     # list registered plugins
+factory init my-factory && cd my-factory           # create a workspace
+factory workflows list | copy NAME                  # packaged templates -> your workspace
+factory validate flutter-app-factory                # by name (or path); fail-fast checks, runs nothing
+factory run flutter-app-factory                     # needs a clean demo-flutter/ (rm -rf demo-flutter to reset)
+factory demo-init && factory run java-migration-demo
+factory run flutter-app-factory-bedrock --only todo_app   # real LLM (Bedrock); costs tokens
+factory run ... --plain                             # no colours/live board (automatic when not a TTY)
+FACTORY_FLUTTER=fake factory run ...                # simulated flutter (tests/demo ONLY); default is the real SDK, error if missing
+```
+
+## Free text -> workflow (`factory ask`)
+`factory ask "quiero una app para llevar mis gastos" [--dry-run] [--yes] [--threshold 0.7] [--router jev|keyword]`
+1. `discover` loads the workspace's `workflows/*.yaml` (then `~/.config/minifactory/workflows`; packaged templates are NOT routable until copied) that have a `route:` block (description, not_for, examples, needs, intake). No block = not routable.
+2. A `router` plugin (`jev` = TypeSafe Jev via HTTP, needs `TYPESAFE_API_KEY`; `keyword` = offline) returns a `Decision`
+   (choice or None, confidence, probabilities, actionable). For Jev, `actionable` comes from one Noul per workflow built from its
+   `route.needs` (what a request must contain to start); only the chosen workflow's answer is used.
+3. Policy is in code (`src/factory/router.py: check`): `--yes` only acts when choice != none, confidence >= threshold and actionable;
+   interactively a vague-but-clear request continues to the drafted input (with a warning), and a low-confidence one lets you pick from the ranking. Nothing runs without confirmation unless `--yes`.
+4. The workflow's `intake` plugin (`app-spec`) drafts the Job with the workflow's own `llm` provider; the user text is wrapped as
+   data and the result is validated (name must be `^[a-z][a-z0-9_]{1,40}$`). Fixture-LLM workflows cannot draft new specs, so only
+   `flutter-app-factory-bedrock.yaml` carries a `route:`.
+To make a workflow routable: add `route:` and, if its input isn't an app spec, register a new `intake` plugin.
+
+## Where the result goes (`factory ask --output`)
+- `--output local [--output-dir DIR]` (default dir `output`): provider `local-dir` -> plain git repo `DIR/<name>` on `main`, git-ignored build
+  output removed, factory notes appended to its README. Refuses to overwrite an existing folder.
+- `--output github [--owner X] [--public]`: provider `github` (uses `gh`, so `gh auth login` is the only credential) creates a PRIVATE repo
+  (README initial commit), pushes branch `factory/<name>` and opens a PR. Public needs `--public`.
+- No flag + a terminal: asked interactively. No flag + no terminal or `--yes`: refuses (never guesses a destination).
+- Both are `scm` providers; `with_output` in `router.py` swaps the workflow's `scm` block. `OpenPR` labels the artifact via
+  `scm.delivery_kind` ("pull_request" / "folder"). `scm.target(name)` is shown before running.
+
+## Layout
+- `src/factory/core/`: engine, workflow validation, registry, events, expression language, ports. **Never imports a plugin.**
+- `src/factory/plugins/builtin/`: `providers_*.py` (scm/llm/secrets/source/executor), `steps_*.py` (steps),
+  `flutter_tool.py` + `fake_flutter.py` (flutter CLI shim and its deterministic fake), `util.py` (git, shell, edit protocol).
+- `src/factory/router.py`: discovery + confidence policy for `ask`. Plugins: `routers.py` (kind `router`), `intakes.py` (kind `intake`).
+- `src/factory/ui.py`: the pretty CLI (rich live board + summary). Only an event subscriber; `cli.py` falls back to plain sinks.
+- `src/factory/workspace.py` (find/init/config), `src/factory/templates.py` + `src/factory/templates/` (packaged workflows and their `assets/`: specs = jobs, fixtures = canned LLM replies).
+- `examples/` (plugin example), `docs/plugins.md`, `tests/`.
+- Run artifacts: `.factory/runs/<workflow>/<job>/{state.json,result.json,work/}` and `events.jsonl`. Generated, git-ignored.
+
+## Workspace (installable layout)
+Code ships in the package; user content lives in a workspace found like git: nearest `factory.yaml` upward from the cwd, else the global
+`$XDG_CONFIG_HOME/minifactory` (default `~/.config/minifactory`), else none (then everything is relative to the cwd, as in development).
+`factory.yaml` keys (all optional, `extra=forbid`, `schema_version: 1`): `workflows_dir runs_dir output_dir router threshold plugins`.
+Precedence: CLI flag > factory.yaml > default. When a workspace is found the CLI `chdir`s to its root, so **relative paths inside a
+workflow resolve from the workspace root**; a file path given on the command line is made absolute first. Workflows also carry
+`schema_version` (only 1 exists). `factory workflows copy` skips identical existing files and refuses to overwrite ones you edited.
+`run_shell` adds `src/` to `PYTHONPATH` only for a source checkout.
+
+## Hard rules
+1. The core never imports a plugin. Plugins register with `@register(kind, name)`; kinds: `step source executor scm llm secrets`.
+2. Step params are a `StrictParams` subclass (unknown keys are errors). Steps return `StepResult`; never raise for expected failures.
+3. The workflow language stays tiny: sequence, `when`, `on_fail`, `blocking`, `${...}`. No loops, calls or arithmetic in YAML:
+   if you need them, write a Python step (see `agent.implement_spec`).
+4. LLM output is untrusted. Validate with pydantic (`agent.plan_app`), confine paths with `safe_path`, bound loops with budgets
+   (`max_attempts`, `max_unproductive`, `max_features`, `max_context_chars`). Follow every agent step with a deterministic gate.
+5. Enrichment (coverage, work items...) uses `blocking: false`: it may annotate the PR but never stop it.
+6. Tests must not need the network, credentials or the Flutter SDK: use the `fixture`/`scripted` LLMs and `fake_flutter`.
+
+## Python standards (new and changed code)
+- Full type hints; `mypy --strict`-clean; pydantic models for any data crossing a step boundary.
+- No bare `except`, no `print` outside `cli.py` (use `ctx.emit` events), `pathlib` over `os.path`.
+- Shell only through `util.run_shell` (it sets `PYTHONPATH` so `python -m factory...` works from step commands).
+- Small, surgical diffs: don't reformat or "improve" code you weren't asked to touch; mention unrelated issues instead.
+- Every new plugin ships with a test; every bug fix ships with a test that failed before.
+
+## Adding a plugin
+See `docs/plugins.md` and `examples/hello_plugin.py`. Load it with `--plugin module` or the `factory.plugins` entry point.
+
+## Known gaps / not done
+- Open-source readiness: MIT LICENSE added (holder "Juan Campuzano", inferred from the account name: confirm). `.github/workflows/ci.yml` (py3.11 + 3.13) has never run; locally only
+  Python 3.14 was exercised, so 3.11 compatibility is unverified. `minifactory` was free on PyPI on 2026-10-20 (HTTP 404), not reserved.
+- `jev` router has only been tested with an injected transport (request shape follows docs.typesafe.ai/api, 2026-10-20); no live
+  call yet. The 0.7 threshold is a starting value to calibrate on real requests. Jev cost/latency not measured.
+- `github` provider verified only against a fake `gh` (tests); it has NOT been run against real GitHub. Creating the first real repo
+  should be done on purpose by the user. Pushes use `gh auth git-credential`, not the machine's configured git credential helper.
+- Real runs (2026-10-20, Haiku 4.5, Flutter real): a 1-line counter app succeeded and was delivered; an "expense tracker" (8 features)
+  failed: features implemented independently do not agree (undefined `ExpenseItem`), repair exhausted 4 attempts, ~$0.48. Bigger apps
+  need better context/ordering between features (not solved).
+- Only one intake exists (`app-spec`). Adding workflows for existing repos (fix a bug, write tests...) needs new intakes.
+- LLM usage: providers may implement `complete_ex(system, prompt) -> (text, usage)`; only `bedrock` does (tokens + optional
+  `cost_usd` from `price_per_mtok`, whose values are set by the user and must be re-checked). `openai` reports no tokens yet.
+- Real-LLM runs of the Flutter workflow (Bedrock, `FACTORY_FLUTTER=real`, `todo_app`), measured on 2026-10-20:
+  Claude Haiku 4.5 SUCCEEDED (analyze ok, 1 test failure fixed by 1 repair attempt, coverage >= 80%, 4 LLM calls,
+  ~14k in / 6.8k out tokens, ~$0.05 using the assumed price of $1/$5 per 1M tokens: verify). Nova Lite (plan/format errors)
+  and Llama 3.3 70B (5 features, 48-177 analyze issues, repair budget exhausted) did NOT produce a green app.
+  Only one app and one run per model: not a benchmark. `claude-haiku-5-5` is not enabled for the test account.
+- No real SCM (Azure DevOps/GitHub), secrets (AWS STS), source (Neptune) or executor (AWS Batch) plugins yet:
+  see the "From toy to your real codemod" table in `README.md`.
+- `scm.init_repo` is an optional capability of the provider (not in the `SCMProvider` Protocol); only `local-git` has it.
+- Re-running the Flutter workflow when a job *failed* after `init` fails at `init` (repo exists): reset `demo-flutter/`.
+- Real `FACTORY_FLUTTER=real` runs were not exercised in tests; the Dart fixtures are plausible but unverified against the SDK.
+
+## Flutter tool selection
+`flutter.*` steps and `flutter_tool` pick the binary by: step param `tool` > `$FACTORY_FLUTTER` > `auto` (= real SDK on PATH; a missing SDK
+is an error, never a silent fake). `fake` is a simulator for tests/offline demos: its projects are NOT real (no flutter dependency in
+pubspec, no platform folders) and its analyze/test prove nothing. the `flutter-app-factory` template (fixture demo) pins `tool: fake`;
+`flutter-app-factory-bedrock` uses the real SDK. Lesson learned 2026-10-20: a default of fake shipped a fake project to GitHub.
+
+## App size (`size` in the spec)
+`minimal | standard | full` (default standard). The `app-spec` intake infers it from the request ("minima", "simple" -> minimal).
+`agent.plan_app` turns it into a feature budget in code (`SIZE_BUDGET`: 2 / 5 / 8) and tells the LLM; an oversized plan gets ONE retry with
+the limit spelled out, then fails rather than overbuild. Measured 2026-10-20 (Haiku 4.5, real Flutter, same request "una app minima con un
+contador..."): before 5 features / 25 tests / 1 repair; after 1 feature / 3 tests / no repair, 2 LLM calls, ~$0.009.

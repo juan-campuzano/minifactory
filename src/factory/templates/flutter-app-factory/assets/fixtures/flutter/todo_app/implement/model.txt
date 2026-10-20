@@ -1,0 +1,20 @@
+FILE: lib/todo.dart
+class Todo {
+  Todo(this.title, {this.done = false});
+
+  final String title;
+  final bool done;
+
+  Todo toggled() => Todo(title, done: !done);
+}
+END_FILE
+FILE: test/todo_test.dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:todo_app/todo.dart';
+
+void main() {
+  test('toggled flips done', () {
+    expect(Todo('a').toggled().done, isTrue);
+  });
+}
+END_FILE
