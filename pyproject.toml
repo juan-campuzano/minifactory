@@ -8,8 +8,22 @@ version = "0.1.0"
 description = "A tiny, pluggable software factory: declarative workflows made of plugin steps"
 requires-python = ">=3.11"
 license = "MIT"
+readme = "README.md"
+authors = [{ name = "Juan Campuzano" }]
+keywords = ["workflow", "agents", "llm", "automation", "software-factory"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.13",
+]
 license-files = ["LICENSE"]
 dependencies = ["pydantic>=2", "pyyaml>=6", "rich>=13", "certifi"]
+
+[project.urls]
+Homepage = "https://github.com/juan-campuzano/minifactory"
+Issues = "https://github.com/juan-campuzano/minifactory/issues"
 
 [project.optional-dependencies]
 aws = ["boto3"]

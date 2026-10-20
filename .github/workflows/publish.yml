@@ -1,0 +1,41 @@
+# Publishes to PyPI when you push a tag like v0.1.0. Uses PyPI "Trusted Publishing" (OIDC): no token is stored anywhere.
+# PyPI setup: owner juan-campuzano, repository minifactory, workflow publish.yml, environment pypi.
+name: publish
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: the tag must match the version in pyproject.toml
+        run: |
+          version=$(python -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          test "v$version" = "${GITHUB_REF_NAME}" || { echo "tag ${GITHUB_REF_NAME} != pyproject version v$version"; exit 1; }
+      - run: pip install -e ".[dev]" build twine
+      - run: ruff check src tests examples
+      - run: pytest -q
+      - run: python -m build
+      - run: twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi          # create it under Settings > Environments; add yourself as required reviewer
+    permissions:
+      id-token: write          # lets PyPI verify this exact workflow, no API token needed
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
