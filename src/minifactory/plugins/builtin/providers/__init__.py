@@ -5,6 +5,7 @@ from . import (  # noqa: F401
     executors,
     github,
     llm,
+    runner,
     scm,
     secrets,
     sources,

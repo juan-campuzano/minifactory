@@ -143,6 +143,15 @@ workflow resolve from the workspace root**; a file path given on the command lin
 `schema_version` (only 1 exists). `minifactory workflows copy` skips identical existing files and refuses to overwrite ones you edited.
 `run_shell` adds `src/` to `PYTHONPATH` only for a source checkout.
 
+## Runner (how commands run)
+Port `Runner.run(cmd, cwd, timeout) -> (rc, output)` (core/ports.py); a workflow picks one with `runner: {use: host}` (default). Steps NEVER spawn
+processes: they call `run_cmd(ctx, cmd, timeout)` (support/shell.py), which uses `ctx.runner` (a test enforces it: no `subprocess` in `steps/`).
+`host` runs on this machine as your user with a FILTERED environment (`support/env.py`): `ALLOWED` = PATH, HOME, locale, proxies and CA bundles,
+toolchain homes (JAVA_HOME, FLUTTER_ROOT...), `MINIFACTORY_*`; NOT AWS_*, API keys or tokens. `with: {pass_env: [MY_*]}` adds names on purpose,
+`with: {env: inherit}` is the old behaviour; `review` flags both. It hides variables, not files: `~/.aws` and `~/.ssh` are still readable, and `support/git.py`
+still passes the whole environment to git itself. The real isolation (OS sandbox such as `srt`/Seatbelt/bubblewrap, or a container) is a future runner
+behind the same port. Verified: python/node/java e2e and real Flutter analyze/test pass under the minimal environment; a secret set in the parent is not visible.
+
 ## Doctor (`minifactory doctor`)
 `src/minifactory/cli/doctor.py`: every machine fact goes through `System` (which/run/getenv/has_module/aws), so tests use a fake one. Without a workflow:
 core, one line per stack profile (a missing toolchain is `info`, not a failure), bedrock/AWS (credentials found + region, never the credentials),
@@ -178,8 +187,9 @@ Package, import name and command are all `minifactory` (the bare name `factory` 
 See `docs/plugins.md` and `examples/hello_plugin.py`. Load it with `--plugin module` or the `minifactory.plugins` entry point.
 
 ## Known gaps / not done
-- NO SANDBOX: `run_shell` runs generated code and test commands on the host. The packaged profiles avoid dependency installs on purpose
-  (stdlib-only), but a user profile or an LLM-edited manifest can add them. A container executor is the missing piece.
+- PARTIAL ISOLATION: commands run on the host as your user. The `host` runner now hides credentials in environment variables, but files (`~/.aws`, `~/.ssh`)
+  and the network are open. The packaged profiles avoid dependency installs on purpose (stdlib-only), but a user profile or an LLM-edited manifest can add
+  them. A sandboxed runner (srt / container) is the missing piece; the port for it exists.
 - Gates prove consistency, not intent (a generated Java "first 20 primes" printed primes up to a limit and passed its own tests).
 - Open-source readiness: MIT LICENSE (holder "Juan Campuzano", inferred from the account name: confirm). CI (`.github/workflows/ci.yml`)
   passes on Python 3.11 and 3.13 (first run 2026-10-20). `minifactory` was free on PyPI on 2026-10-20 (HTTP 404) but is NOT reserved:

@@ -12,7 +12,7 @@ from minifactory.core.context import Step, StepContext, StrictParams
 from minifactory.core.models import StepResult
 from minifactory.core.registry import register
 from minifactory.plugins.builtin.support.git import commit_all
-from minifactory.plugins.builtin.support.shell import run_shell, safe_path
+from minifactory.plugins.builtin.support.shell import run_cmd, safe_path
 
 
 def profile_for(ctx: StepContext, name: str | None) -> stacks.StackProfile:
@@ -75,7 +75,7 @@ class Scaffold(Step):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(stacks.render(content, name=name))
         for command in profile.scaffold:
-            rc, out = run_shell(stacks.render(command, name=name), ctx.repo_dir, p.timeout)
+            rc, out = run_cmd(ctx, stacks.render(command, name=name), p.timeout)
             if rc != 0:
                 return StepResult.failed((out.splitlines() or [f"exit code {rc}"])[-1])
         commit_all(ctx.repo_dir, f"chore: scaffold {profile.name} project")
@@ -107,7 +107,7 @@ class Check(Step):
         if key not in profile.commands:
             return StepResult(status="skipped", message=f"the {profile.name} stack has no '{key}' command")
         command = stacks.render(profile.commands[key], name=stacks.project_name(ctx.job.name), paths=paths)
-        rc, out = run_shell(command, ctx.repo_dir, p.timeout)
+        rc, out = run_cmd(ctx, command, p.timeout)
         outputs = {"rc": rc, "output": out[-4000:]}
         last = (out.splitlines() or [f"exit code {rc}"])[-1]
         if not p.expect_failure:

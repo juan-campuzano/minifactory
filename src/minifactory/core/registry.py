@@ -7,7 +7,7 @@ from typing import Any, Callable, Iterable
 
 from .errors import PluginNotFound
 
-KINDS = ("step", "source", "executor", "scm", "llm", "secrets", "router", "intake")
+KINDS = ("step", "source", "executor", "scm", "llm", "secrets", "router", "intake", "runner")
 _REG: dict[str, dict[str, Any]] = {k: {} for k in KINDS}
 
 

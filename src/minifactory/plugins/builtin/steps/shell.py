@@ -6,7 +6,7 @@ from __future__ import annotations
 from minifactory.core.context import Step, StepContext, StrictParams
 from minifactory.core.models import StepResult
 from minifactory.core.registry import register
-from minifactory.plugins.builtin.support.shell import run_shell, safe_path
+from minifactory.plugins.builtin.support.shell import run_cmd, safe_path
 
 
 class ShellParams(StrictParams):
@@ -22,7 +22,7 @@ class ShellRun(Step):
     Params = ShellParams
 
     def run(self, ctx: StepContext, p: ShellParams) -> StepResult:
-        rc, out = run_shell(p.cmd, ctx.repo_dir, p.timeout)
+        rc, out = run_cmd(ctx, p.cmd, p.timeout)
         outputs = {"rc": rc, "output": out[-4000:]}
         if p.expect_failure:
             if rc in (124, 127):

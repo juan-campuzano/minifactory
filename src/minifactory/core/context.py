@@ -27,6 +27,7 @@ class StepContext:
     emit: Callable[..., None]
     outputs: dict[str, dict[str, Any]] = field(default_factory=dict)  # step id -> outputs
     notes: list[str] = field(default_factory=list)
+    runner: Any = None  # Runner: how commands run. None (tests) means the default host runner.
 
     @property
     def repo_dir(self) -> Path:

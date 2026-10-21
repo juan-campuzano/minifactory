@@ -39,6 +39,14 @@ class Executor(Protocol):
     def run(self, jobs: list[Job], fn: Callable[[Job], JobResult]) -> list[JobResult]: ...
 
 
+class Runner(Protocol):
+    """How a shell command is executed: where, as whom, with what environment. Steps never spawn processes
+    themselves, so the isolation can change (this machine, an OS sandbox, a container) without touching them."""
+
+    def run(self, cmd: str, cwd: Path, timeout: int = 120) -> tuple[int, str]:
+        """Return (exit code, combined output). 124 = timed out; an empty command must not pass."""
+
+
 class Router(Protocol):
     def choose(self, request: str, candidates: list[Candidate]) -> Decision: ...
 

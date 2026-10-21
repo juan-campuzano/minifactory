@@ -63,6 +63,7 @@ class WorkflowSpec(BaseModel):
     vars: dict[str, Any] = Field(default_factory=dict)
     source: PluginRef
     executor: PluginRef = PluginRef(use="local")
+    runner: PluginRef = PluginRef(use="host")  # how commands run: see ports.Runner
     providers: dict[str, PluginRef] = Field(default_factory=dict)
     steps: list[StepSpec]
 
@@ -104,6 +105,7 @@ def validate_spec(spec: WorkflowSpec) -> None:
         registry.get("intake", spec.route.intake)
     registry.get("source", spec.source.use)
     registry.get("executor", spec.executor.use)
+    registry.get("runner", spec.runner.use)
 
     seen: list[str] = []
     for step in spec.steps:

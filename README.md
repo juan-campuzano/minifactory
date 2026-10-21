@@ -193,6 +193,9 @@ every shell command, repository write and paid LLM call it contains.
 
 ## Design principles
 
+- **Commands see no credentials by default.** The generated code and the tests of a repository you clone run with a filtered
+  environment (no AWS keys, tokens or API keys; `pass_env` adds names on purpose). Files are not hidden: a sandboxed runner is next.
+
 - **Untrusted agent output.** Edits are parsed strictly: a `PATCH` must match exactly once or nothing is written;
   paths cannot escape the repo; plans are validated with pydantic; the Bedrock provider rejects a reply cut off by the token limit.
 - **Bounded loops.** Repair attempts, unproductive attempts, features per plan and context size all have budgets.

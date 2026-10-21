@@ -14,6 +14,7 @@ entry point (see `pyproject.toml`).
 | `executor` | `run(jobs, fn) -> list[JobResult]` | `executor.use` |
 | `router` | `choose(request, candidates) -> Decision` | `minifactory ask --router NAME` |
 | `intake` | `build(request, llm) -> Job` | `route.intake` in a workflow |
+| `runner` | `run(cmd, cwd, timeout) -> (rc, output)` | `runner:` in a workflow (default `host`) |
 
 Constructor arguments of providers/sources/executors come from the `with:` block. A provider whose `__init__`
 takes `secrets` gets the secrets provider injected.

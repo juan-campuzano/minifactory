@@ -94,6 +94,23 @@ def test_each_kind_of_plugin_only_uses_its_own_kind_and_the_shared_support():
     assert problems == []
 
 
+def test_steps_never_spawn_processes_themselves_so_the_runner_cannot_be_bypassed():
+    """A step that called subprocess/os.system directly would run outside the workflow's runner (its sandbox,
+    its environment policy). Steps use `run_cmd` (shell commands) or `support.git` (git)."""
+    bad = []
+    for path in python_files(SRC / "plugins/builtin/steps"):
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            names = ([a.name for a in node.names] if isinstance(node, ast.Import)
+                     else [node.module or ""] if isinstance(node, ast.ImportFrom) else [])
+            if any(n.split(".")[0] in {"subprocess", "pty", "pexpect"} for n in names):
+                bad.append(f"{path.relative_to(ROOT)}")
+            if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) \
+                    and node.value.id == "os" and node.attr in {"system", "popen", "execv", "execvp", "spawnv"}:
+                bad.append(f"{path.relative_to(ROOT)} (os.{node.attr})")
+    assert bad == [], f"use run_cmd(ctx, ...) instead: {sorted(set(bad))}"
+
+
 def test_the_package_top_level_has_only_the_expected_modules_and_folders():
     modules = {p.stem for p in SRC.glob("*.py")}
     packages = {p.name for p in SRC.iterdir() if p.is_dir() and p.name != "__pycache__"}

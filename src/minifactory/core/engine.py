@@ -62,6 +62,7 @@ class Engine:
         self.llm = self._build("llm", spec.providers["llm"]) if "llm" in spec.providers else None
         self.source = self._build("source", spec.source)
         self.executor = self._build("executor", spec.executor)
+        self.runner = self._build("runner", spec.runner)
 
     # -- construction -------------------------------------------------------------
     def _build(self, kind: str, ref: PluginRef) -> Any:
@@ -104,6 +105,7 @@ class Engine:
             llm=_MeteredLLM(self.llm, emit) if self.llm else None,
             secrets=self.secrets,
             emit=emit,
+            runner=self.runner,
         )
         records: list[StepRecord] = []
         artifacts = []

@@ -47,6 +47,10 @@ def review(spec: WorkflowSpec) -> list[Finding]:
             out.append(Finding(False, f"step '{step.id}' lets an LLM edit files ({step.use})"))
         if "${env." in str(step.with_) and "${env.python}" not in str(step.with_):
             out.append(Finding(True, f"step '{step.id}' reads environment variables"))
+    if spec.runner.use == "host" and (spec.runner.with_.get("env") == "inherit" or spec.runner.with_.get("pass_env")):
+        how = "inherit your whole environment" if spec.runner.with_.get("env") == "inherit" else (
+            f"also see: {', '.join(spec.runner.with_['pass_env'])}")
+        out.append(Finding(True, f"runner: commands {how} (credentials included if they match)"))
     for kind, ref in spec.providers.items():
         if ref.use in _PROVIDERS:
             out.append(Finding(ref.use == "github", f"provider {kind}: {ref.use} {_PROVIDERS[ref.use]}"))

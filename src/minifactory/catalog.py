@@ -80,6 +80,7 @@ route:                            # optional: makes `minifactory ask` able to ch
 vars: {key: value}                # constants, read as ${vars.key}
 source: {use: <source>, with: {...}}       # where the jobs come from
 executor: {use: local}                      # optional
+runner: {use: host}                         # optional: how commands run (default: your user, a filtered environment)
 providers:                                  # only the ones the steps need
   scm: {use: <scm>, with: {...}}
   llm: {use: <llm>, with: {...}}
