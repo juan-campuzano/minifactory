@@ -3,3 +3,4 @@ description: A notes app whose generated tests miss one file, so the non-blockin
 features:
   - notes storage
   - notes screen
+stack: flutter

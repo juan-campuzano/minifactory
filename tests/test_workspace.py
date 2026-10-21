@@ -126,8 +126,8 @@ def test_packaged_templates_are_not_routable_until_copied(tmp_path):
     root = make_workspace(tmp_path / "proj")
     with pytest.raises(RoutingError, match="minifactory workflows copy"):
         R.discover(workspace.find(root).workflow_dirs)
-    templates.copy("flutter-app-factory-bedrock", root)
-    assert "flutter-app-factory-bedrock" in R.discover(workspace.find(root).workflow_dirs)
+    templates.copy("app-factory", root)
+    assert "app-factory" in R.discover(workspace.find(root).workflow_dirs)
 
 
 def test_unknown_workflow_name_lists_what_exists(tmp_path, capsys):
@@ -149,7 +149,7 @@ def test_copy_is_idempotent_shares_assets_but_never_overwrites_your_edits(tmp_pa
     root = make_workspace(tmp_path / "p")
     first = templates.copy("flutter-app-factory", root)
     assert templates.copy("flutter-app-factory", root) == []  # nothing new, no error
-    assert templates.copy("flutter-app-factory-bedrock", root)  # shares specs/todo_app.yaml: skipped, not a clash
+    assert templates.copy("app-factory", root)  # a second template next to the first: no clash
     assert len(first) > 10
     mine = root / "workflows" / "flutter-app-factory.yaml"
     mine.write_text(mine.read_text() + "\n# my edit\n")

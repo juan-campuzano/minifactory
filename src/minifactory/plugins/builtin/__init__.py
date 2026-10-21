@@ -14,5 +14,6 @@ from . import (  # noqa: F401
     steps_existing,
     steps_flutter,
     steps_scm,
+    steps_stack,
     steps_workflows,
 )

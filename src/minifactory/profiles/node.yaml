@@ -1,0 +1,35 @@
+name: node
+description: "Node.js 20+ (CommonJS, no dependencies: node:test and node:assert). Sources at the root or in src/, tests in test/."
+requires: [node]
+detect: [package.json]
+manifest: package.json
+seed_files:
+  package.json: |
+    {
+      "name": "{name}",
+      "version": "0.1.0",
+      "private": true,
+      "scripts": { "test": "node --test" }
+    }
+  .gitignore: |
+    node_modules/
+    coverage/
+commands:
+  analyze: "find . -name '*.js' -not -path './node_modules/*' -exec node --check {} +"
+  test: "node --test"
+  test_files: "node --test {paths}"
+source_globs: ["src/**/*.js", "*.js", "bin/**/*.js", "lib/**/*.js"]
+test_globs: ["test/**/*.js"]
+test_prefixes: ["test/"]
+repro_test_path: test/factory_repro.test.js
+file_example: ["src/cli.js", "test/cli.test.js"]
+broken_test_patterns: ["SyntaxError", "Cannot find module"]
+hints: |
+  Tests use the built-in runner (`require('node:test')`, `require('node:assert')`) in *.test.js files; require the
+  code under test with a path relative to the test file.
+new_project_hints: |
+  Node.js 20+, CommonJS (require / module.exports), NO third-party dependencies and no npm installs.
+  Tests live in test/ as *.test.js files using the built-in runner: `const test = require('node:test')`
+  and `const assert = require('node:assert')`. A command-line program goes in src/cli.js (export a
+  function that takes the argument list and returns the output, so it can be tested) with a tiny
+  bin/{name}.js entry that calls it, and a "bin" entry in package.json.

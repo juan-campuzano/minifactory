@@ -1,11 +1,12 @@
-# Fixes a bug in an EXISTING GitHub repository (Flutter/Dart): reproduces it with a failing test, fixes it, opens a PR.
-# Never touches the default branch: the work goes to a new branch and a pull request. Needs `gh auth login`,
-# AWS credentials for Bedrock and the Flutter SDK. Costs LLM tokens.
+# Fixes a bug in an EXISTING GitHub repository: reproduces it with a failing test, fixes it, opens a PR.
+# Works in any stack that has a profile (python, node, flutter; add your own in stacks/). Never touches the
+# default branch: the work goes to a new branch and a pull request. Needs `gh auth login`, AWS credentials for
+# Bedrock and the stack's own tools. Costs LLM tokens.
 
 name: fix-bug
 
 route:
-  description: Fix a bug in an EXISTING GitHub repository (Flutter/Dart). Reproduces it with a failing test, fixes it and opens a pull request
+  description: Fix a bug in an EXISTING GitHub repository. Reproduces it with a failing test, fixes it and opens a pull request
   not_for:
     - creating a new app or project from scratch
     - adding a new feature to an existing repository
@@ -48,60 +49,66 @@ steps:
   - id: clone
     use: scm.clone
 
+  # Which stack is this repository? Unknown or ambiguous = stop, nothing is spent.
+  - id: detect
+    use: stack.detect
+    on_fail: discard
+
   # A repo that does not even analyse cleanly cannot be judged: stop before spending anything.
   - id: baseline
-    use: flutter.analyze
+    use: stack.check
+    with: { check: analyze, stack: "${steps.detect.outputs.stack}" }
     on_fail: discard
 
   - id: locate
     use: agent.locate_files
-    with:
-      task: "${job.task}"
-      globs: ["lib/*", "test/*", "pubspec.yaml"]
+    with: { task: "${job.task}", stack: "${steps.detect.outputs.stack}" }
 
-  # 1. Prove the bug: a new test, only under test/, that fails because of it.
+  # 1. Prove the bug: a new test, only in the stack's test folders, that fails because of it.
   - id: repro
     use: agent.edit
     with:
+      stack: "${steps.detect.outputs.stack}"
+      tests_only: true
       instruction: >-
-        Write ONE new Flutter test file, test/factory_repro_test.dart, that reproduces this bug and
-        fails because of it (not because of a missing import or a compile error). Change no other file.
-        BUG: ${job.task}
+        Write ONE new test file, at the REPRO_TEST_PATH above, that reproduces this bug and fails because of
+        it (not because of a missing import or a syntax error). Change no other file. BUG: ${job.task}
       files: "${steps.locate.outputs.files}"
-      allowed_prefixes: ["test/"]
       commit_message: "test: reproduce the bug"
 
   - id: repro_fails
-    use: flutter.test
-    with: { paths: ["test/factory_repro_test.dart"], expect_failure: true }
+    use: stack.check
+    with: { check: test, repro: true, expect_failure: true, stack: "${steps.detect.outputs.stack}" }
     on_fail: discard            # not reproduced = nothing safe to fix: stop, change nothing
 
   # 2. Fix it with the smallest change that makes that test pass.
   - id: fix
     use: agent.edit
     with:
+      stack: "${steps.detect.outputs.stack}"
       instruction: >-
-        Fix this bug with the smallest possible change to the production code. Do not edit
-        test/factory_repro_test.dart. Prefer PATCH edits. BUG: ${job.task}
+        Fix this bug with the smallest possible change to the production code. Do not edit the reproduction
+        test. Prefer PATCH edits. BUG: ${job.task}
       files: "${steps.locate.outputs.files}"
-      extra_files: ["test/factory_repro_test.dart"]
       extra: "${steps.repro_fails.outputs.output}"
       commit_message: "fix: ${job.repo}"
 
   - id: analyze
-    use: flutter.analyze
+    use: stack.check
+    with: { check: analyze, stack: "${steps.detect.outputs.stack}" }
     on_fail: continue
 
   - id: test
-    use: flutter.test
+    use: stack.check
+    with: { check: test, stack: "${steps.detect.outputs.stack}" }
     on_fail: continue
 
   - id: repair
     use: agent.repair_build
     when: "steps.analyze.status == 'failed' or steps.test.status == 'failed'"
     with:
-      verify_cmd: "${env.python} -m minifactory.plugins.builtin.flutter_tool analyze && ${env.python} -m minifactory.plugins.builtin.flutter_tool test"
-      globs: ["lib/**/*.dart", "test/**/*.dart", "pubspec.yaml"]
+      stack: "${steps.detect.outputs.stack}"
+      checks: [analyze, test]
       max_attempts: 3
       max_unproductive: 2
 

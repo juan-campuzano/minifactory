@@ -1,0 +1,6 @@
+name: hello_cli
+description: A tiny command-line program that greets the person whose name you pass it.
+features:
+  - greet a name given as an argument, or the world when there is none
+size: minimal
+stack: python

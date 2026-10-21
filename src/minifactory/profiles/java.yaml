@@ -1,0 +1,34 @@
+name: java
+description: "Java 17+ with the JDK only (javac and java; no Maven/Gradle, no JUnit). Tests are classes with a main method."
+requires: [javac, java]
+detect: []
+seed_files:
+  .gitignore: |
+    build/
+    *.class
+commands:
+  analyze: "rm -rf build && mkdir -p build && javac -Xlint:all -d build $(find src -name '*.java')"
+  test: >-
+    rm -rf build && mkdir -p build && test -n "$(find src/test -name '*Test.java' 2>/dev/null)" &&
+    javac -d build $(find src -name '*.java') &&
+    for f in $(find src/test -name '*Test.java'); do
+    c=$(echo "${f#src/test/java/}" | sed 's/\.java$//; s#/#.#g'); java -ea -cp build "$c" || exit 1; done
+  test_files: >-
+    rm -rf build && mkdir -p build && javac -d build $(find src -name '*.java') &&
+    for f in {paths}; do
+    c=$(echo "${f#src/test/java/}" | sed 's/\.java$//; s#/#.#g'); java -ea -cp build "$c" || exit 1; done
+source_globs: ["src/main/java/**/*.java"]
+test_globs: ["src/test/java/**/*.java"]
+test_prefixes: ["src/test/java/"]
+repro_test_path: src/test/java/FactoryReproTest.java
+file_example: ["src/main/java/Greeter.java", "src/test/java/GreeterTest.java"]
+broken_test_patterns: ["error:", "ClassNotFoundException", "NoClassDefFoundError"]
+hints: |
+  A test is a class whose name ends in `Test` with a `public static void main(String[] args)` that runs `assert`
+  checks (tests run with -ea) or throws on failure; follow the package layout of the existing sources.
+new_project_hints: |
+  Java 17+ with the JDK only: no Maven, no Gradle, no JUnit, no third-party libraries.
+  Sources under src/main/java/, tests under src/test/java/ in the default package (no `package` line) unless
+  the project needs one. A test is a class whose name ends in `Test` with a `public static void main(String[] args)`
+  that runs `assert` checks (the tests run with -ea) or throws on failure. A command-line program is a class
+  `Main` with a main method that delegates to a testable method.

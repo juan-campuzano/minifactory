@@ -1,7 +1,7 @@
 # Creates a Flutter app from a spec: plan -> implement -> gates -> repair -> PR.
 # Run from the project root:  minifactory run workflows/flutter-app-factory.yaml
 # DEMO: uses a simulated `flutter` (tool: fake) and canned LLM replies: no SDK, no tokens, and the
-# generated projects are NOT real Flutter projects. For real output use flutter-app-factory-bedrock.yaml.
+# generated projects are NOT real Flutter projects. For real output use the `app-factory` template.
 
 name: flutter-app-factory
 

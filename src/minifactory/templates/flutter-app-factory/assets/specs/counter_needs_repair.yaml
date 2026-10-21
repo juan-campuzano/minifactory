@@ -2,3 +2,4 @@ name: counter_needs_repair
 description: A counter app. The first LLM attempt uses a removed widget, so the repair loop has to fix it.
 features:
   - counter screen with an increment button
+stack: flutter

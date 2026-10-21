@@ -75,6 +75,16 @@ def file_blocks(repo_dir: Path, files: list[str]) -> str:
     return "\n".join(out)
 
 
+_SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", "build", ".dart_tool", "dist", ".gradle"}
+
+
+def glob_match(path: str, pattern: str) -> bool:
+    """`*` stays inside a folder, `**/` spans folders (including none), like shell globstar."""
+    regex = re.escape(pattern).replace(r"\*\*/", "\x00").replace(r"\*\*", ".*").replace(r"\*", "[^/]*")
+    regex = regex.replace(r"\*", "[^/]*").replace("\x00", "(?:.*/)?").replace(r"\?", "[^/]")
+    return re.fullmatch(regex, path) is not None
+
+
 def collect_files(repo_dir: Path, files: list[str], globs: list[str],
                   max_chars: int = 60_000) -> list[str]:
     """Explicit `files` first, then glob matches, stopping once the context budget is spent.
@@ -87,7 +97,7 @@ def collect_files(repo_dir: Path, files: list[str], globs: list[str],
             raise ValueError(f"glob must be relative and stay inside the repository: {pattern}")
         for path in sorted(repo_dir.glob(pattern)):
             rel = path.relative_to(repo_dir).as_posix()
-            if not path.is_file() or rel in found:
+            if not path.is_file() or rel in found or _SKIP_DIRS & set(Path(rel).parts):
                 continue
             used += len(path.read_text())
             if used > max_chars:

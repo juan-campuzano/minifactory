@@ -3,3 +3,4 @@ description: A simple to-do list app that shows a list of todos and lets you tog
 features:
   - todo model with a title and a done flag
   - screen listing the todos
+stack: flutter

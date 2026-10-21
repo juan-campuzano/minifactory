@@ -7,7 +7,7 @@ Tool-specific files (CLAUDE.md, GEMINI.md...) should not exist; if one is needed
 `minifactory`: a small engine that runs **declarative workflows** (YAML) made of **plugin steps** over a queue of
 **jobs**. Environment-specific things (git host, LLM, secrets, where jobs run, what to work on) sit behind **ports**.
 Packaged templates (`src/minifactory/templates/<name>/`): `flutter-app-factory` (offline demo: fixture LLM + fake flutter),
-`flutter-app-factory-bedrock` (real: Bedrock + real Flutter; the one `ask` uses) and `java-migration-demo` (a miniature batch
+`app-factory` (real: Bedrock + the stack's tools; new projects in any stack; the one `ask` uses for them) and `java-migration-demo` (a miniature batch
 migration: toy repos, a baseline gate, a repair loop). They are copied into a workspace; the package itself never runs from its own folders.
 
 ## Commands
@@ -22,7 +22,7 @@ minifactory workflows list | copy NAME                  # packaged templates -> 
 minifactory validate flutter-app-factory                # by name (or path); fail-fast checks, runs nothing
 minifactory run flutter-app-factory                     # needs a clean demo-flutter/ (rm -rf demo-flutter to reset)
 minifactory demo-init && minifactory run java-migration-demo
-minifactory run flutter-app-factory-bedrock --only todo_app   # real LLM (Bedrock); costs tokens
+minifactory run app-factory                         # real LLM (Bedrock); costs tokens
 minifactory run ... --plain                             # no colours/live board (automatic when not a TTY)
 FACTORY_FLUTTER=fake minifactory run ...                # simulated flutter (tests/demo ONLY); default is the real SDK, error if missing
 ```
@@ -37,7 +37,7 @@ FACTORY_FLUTTER=fake minifactory run ...                # simulated flutter (tes
    interactively a vague-but-clear request continues to the drafted input (with a warning), and a low-confidence one lets you pick from the ranking. Nothing runs without confirmation unless `--yes`.
 4. The workflow's `intake` plugin (`app-spec`) drafts the Job with the workflow's own `llm` provider; the user text is wrapped as
    data and the result is validated (name must be `^[a-z][a-z0-9_]{1,40}$`). Fixture-LLM workflows cannot draft new specs, so only
-   `flutter-app-factory-bedrock.yaml` carries a `route:`.
+   `app-factory`, `fix-bug` and `create-workflow` carry a `route:`.
 To make a workflow routable: add `route:` and, if its input isn't an app spec, register a new `intake` plugin.
 
 ## Where the result goes (`minifactory ask --output`)
@@ -86,6 +86,19 @@ Verified 2026-10-20 with Haiku 4.5: a feasible goal gave a valid 4-step draft in
 Not done: a dry-run of the draft with fake providers (it is validated, reviewed and not executed); judging whether a *valid* draft is *sensible*
 is the reviewer's job (e.g. the dart-format draft picked the `repo-task` intake, which expects a bug description).
 
+## Stack profiles (languages)
+All language knowledge is data in `src/minifactory/profiles/*.yaml` (python, node, java, flutter) plus the workspace's `stacks/*.yaml`
+(`minifactory/stacks.py`; field reference in `docs/stacks.md`). Generic steps read them: `stack.detect` (existing repo), `stack.scaffold`,
+`stack.check` (setup/analyze/test/format; `repro` + `expect_failure` = "the bug is reproduced" gate with `broken_test_patterns`), and
+`agent.plan_app`/`implement_spec`/`edit`/`locate_files`/`repair_build` take `stack` (default: `${job.stack}`). The `app-spec` intake lists the
+INSTALLED stacks to the LLM and refuses `unsupported`/unknown ones; `fix-bug` detects the stack from files (`detect`, ambiguity = fails).
+Two kinds of guidance on purpose: `hints` (how tests are written: always shown) and `new_project_hints` (layout/constraints: only for projects we
+create; showing them for an existing repo made the LLM invent a package path from the job name `acme/textkit`).
+Lessons (2026-10-20): `compileall` wrote .pyc into the repo (stale bytecode + bytecode in the PR): analyze must not write; a stack's test run must fail
+when it finds no tests; the Dart bias came from `agent.plan_app`'s hardcoded `lib/todo.dart` example, so no step may embed a language.
+Verified with Haiku 4.5 and the real toolchains: python CLI, node script and java program created and passing their own checks; a python bug fixed
+with a one-line change + regression test; `cobol` rejected. Not verified: Maven/Gradle (no profile), sandboxing (see gaps).
+
 ## Workspace (installable layout)
 Code ships in the package; user content lives in a workspace found like git: nearest `minifactory.yaml` upward from the cwd, else the global
 `$XDG_CONFIG_HOME/minifactory` (default `~/.config/minifactory`), else none (then everything is relative to the cwd, as in development).
@@ -121,6 +134,9 @@ Package, import name and command are all `minifactory` (the bare name `factory` 
 See `docs/plugins.md` and `examples/hello_plugin.py`. Load it with `--plugin module` or the `minifactory.plugins` entry point.
 
 ## Known gaps / not done
+- NO SANDBOX: `run_shell` runs generated code and test commands on the host. The packaged profiles avoid dependency installs on purpose
+  (stdlib-only), but a user profile or an LLM-edited manifest can add them. A container executor is the missing piece.
+- Gates prove consistency, not intent (a generated Java "first 20 primes" printed primes up to a limit and passed its own tests).
 - Open-source readiness: MIT LICENSE (holder "Juan Campuzano", inferred from the account name: confirm). CI (`.github/workflows/ci.yml`)
   passes on Python 3.11 and 3.13 (first run 2026-10-20). `minifactory` was free on PyPI on 2026-10-20 (HTTP 404) but is NOT reserved:
   publishing needs a PyPI account and token (or Trusted Publishing), which the factory does not have.
@@ -151,7 +167,7 @@ See `docs/plugins.md` and `examples/hello_plugin.py`. Load it with `--plugin mod
 `flutter.*` steps and `flutter_tool` pick the binary by: step param `tool` > `$FACTORY_FLUTTER` > `auto` (= real SDK on PATH; a missing SDK
 is an error, never a silent fake). `fake` is a simulator for tests/offline demos: its projects are NOT real (no flutter dependency in
 pubspec, no platform folders) and its analyze/test prove nothing. the `flutter-app-factory` template (fixture demo) pins `tool: fake`;
-`flutter-app-factory-bedrock` uses the real SDK. Lesson learned 2026-10-20: a default of fake shipped a fake project to GitHub.
+`app-factory` uses the stack's real tools. Lesson learned 2026-10-20: a default of fake shipped a fake project to GitHub.
 
 ## App size (`size` in the spec)
 `minimal | standard | full` (default standard). The `app-spec` intake infers it from the request ("minimal", "simple" -> minimal).

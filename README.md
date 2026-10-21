@@ -111,8 +111,8 @@ Copy one into your workspace with `minifactory workflows copy NAME`; only copied
 | template | what it does | needs |
 |---|---|---|
 | `flutter-app-factory` | the offline demo above | nothing |
-| `flutter-app-factory-bedrock` | creates a **new** Flutter app from a one-line request, sized to the request ("minimal" means few features) | AWS credentials (Bedrock), Flutter SDK |
-| `fix-bug` | fixes a bug in an **existing** GitHub repo: reproduces it with a failing test, fixes it minimally, opens a PR | `gh auth login`, AWS credentials, Flutter SDK |
+| `app-factory` | creates a **new** project (an app, a CLI, a library) from a one-line request, in Python, Node, Java or Flutter, sized to the request | AWS credentials (Bedrock) and the stack's tools |
+| `fix-bug` | fixes a bug in an **existing** GitHub repo (Python, Node or Flutter, detected from its files): reproduces it with a failing test, fixes it minimally, opens a PR | `gh auth login`, AWS credentials, the stack's tools |
 | `create-workflow` | drafts a **new workflow** from a plain-language goal, using only the steps and plugins that exist (see below) | AWS credentials (Bedrock) |
 | `java-migration-demo` | a batch transform over toy repos: deterministic branch vs LLM branch, baseline gate, repair loop | nothing |
 
@@ -131,6 +131,21 @@ minifactory ask "a simple app to track my expenses"             # same, then ask
    validated), and you confirm before anything runs.
 4. **Where results go** is your choice for new projects: `--output local` (a plain git folder) or
    `--output github` (a new private repo plus a pull request; `--public` to change that).
+
+## Languages: stack profiles
+
+Everything language-specific is data: a **stack profile** says how to recognise a stack, how to scaffold it, which commands
+analyse and test it, where code and tests live, and what an LLM should know about its idioms. Packaged: `python`, `node`,
+`java` (JDK only: no Maven, Gradle or JUnit) and `flutter`. `ask` picks the stack from your request, and when it matches
+none of them it **says so** instead of building the wrong thing:
+
+```
+$ minifactory ask "a cobol program that prints hello"
+error: no supported stack matches this request (got 'unsupported'; available: flutter, java, node, python). Add one as stacks/<name>.yaml
+```
+
+Add a language by dropping a YAML file in your workspace's `stacks/` folder (field reference in [`docs/stacks.md`](docs/stacks.md)):
+no code needed.
 
 ## Fix a bug in an existing repo
 
@@ -221,7 +236,9 @@ coding agent (or work with one) on this repo.
 ## Limitations
 
 - **Alpha.** Only Python 3.11 and 3.13 are tested in CI.
-- The example workflows target Flutter/Dart. Other stacks need their own steps (or `shell.run`).
+- Stack profiles ship for Python, Node, Java (JDK only) and Flutter. A Maven/Gradle project needs your own profile.
+- The gates check that generated code is *consistent* (it builds and its own tests pass), not that it does what you meant:
+  a generated Java "first twenty primes" program printed the primes up to a limit, and passed its own tests.
 - The real-model runs were small: a one-line app, and a seeded one-line bug in a small repo. Larger apps, where
   features must agree with each other, are not solved: expect failures there.
 - The `github` provider has been exercised against a fake `gh` in tests and has created repos in manual runs; the

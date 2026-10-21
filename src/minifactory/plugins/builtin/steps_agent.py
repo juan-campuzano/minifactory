@@ -3,12 +3,16 @@ and the workflow follows it with a deterministic gate (a build), never trusts it
 
 from __future__ import annotations
 
+import json
+
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from minifactory import stacks
 from minifactory.core.context import Step, StepContext, StrictParams
 from minifactory.core.models import StepResult
 from minifactory.core.registry import register
 
+from .steps_stack import optional_profile
 from .util import (
     SYSTEM_PROMPT,
     PatchError,
@@ -47,7 +51,10 @@ class LLMMigrate(Step):
 
 
 class RepairParams(StrictParams):
-    verify_cmd: str
+    verify_cmd: str = ""  # a shell command, or leave empty and use `stack` + `checks`
+    stack: str | None = None
+    checks: list[str] = Field(default_factory=list)  # e.g. [analyze, test]: the stack's commands, run in order
+    new_project: bool = False  # true when repairing a project this workflow just created (layout rules apply)
     files: list[str] = Field(default_factory=list)
     globs: list[str] = Field(default_factory=list)  # e.g. lib/**/*.dart, for dynamic file sets
     max_context_chars: int = 60_000
@@ -71,15 +78,26 @@ class RepairBuild(Step):
     needs = ("llm",)
 
     def run(self, ctx: StepContext, p: RepairParams) -> StepResult:
-        if not p.files and not p.globs:
-            return StepResult.failed("repair_build needs `files` and/or `globs`")
-        rc, out = run_shell(p.verify_cmd, ctx.repo_dir, p.timeout)
+        profile = optional_profile(ctx, p.stack)
+        verify_cmd = p.verify_cmd
+        if not verify_cmd and profile and p.checks:
+            name = stacks.project_name(ctx.job.name)
+            verify_cmd = " && ".join(stacks.render(profile.commands[c], name=name)
+                                     for c in p.checks if c in profile.commands)
+        if not verify_cmd:
+            return StepResult.failed("repair_build needs `verify_cmd`, or a stack with `checks` it has commands for")
+        globs = p.globs or (profile.context_globs if profile and not p.files else [])
+        if not p.files and not globs:
+            return StepResult.failed("repair_build needs `files` and/or `globs` (or a stack)")
+        context = p.context or (stacks.guidance(profile, stacks.project_name(ctx.job.name), new_project=p.new_project)
+                                if profile else "")
+        rc, out = run_shell(verify_cmd, ctx.repo_dir, p.timeout)
         unproductive = 0
         for attempt in range(1, p.max_attempts + 1):
             if rc == 0:
                 return StepResult.ok(f"green after {attempt - 1} attempt(s)", attempts=attempt - 1)
-            files = collect_files(ctx.repo_dir, p.files, p.globs, p.max_context_chars)
-            guidance = f"{p.context}\n\n" if p.context else ""
+            files = collect_files(ctx.repo_dir, p.files, globs, p.max_context_chars)
+            guidance = f"{context}\n\n" if context else ""
             prompt = (f"TASK: repair\nAPP: {ctx.job.name}\n{guidance}The build fails with:\n{out}\n\n"
                       f"{file_blocks(ctx.repo_dir, files)}")
             try:
@@ -133,7 +151,7 @@ SIZE_HINT = {
 
 
 class PlanParams(StrictParams):
-    pass
+    stack: str | None = None  # default: the job's `stack`
 
 
 @register("step", "agent.plan_app")
@@ -149,13 +167,18 @@ class PlanApp(Step):
         spec = ctx.job.attrs
         size = spec.get("size") if spec.get("size") in SIZE_BUDGET else "standard"
         budget = SIZE_BUDGET[size]
+        profile = optional_profile(ctx, p.stack)
+        name = stacks.project_name(ctx.job.name)
+        example = [stacks.render(f, name=name) for f in (profile.file_example if profile else
+                                                          ["path/to/source_file", "path/to/test_file"])]
+        stack_note = stacks.guidance(profile, name, new_project=True) if profile else ""
         requested = "\n".join(f"- {f}" for f in spec.get("features", []))
-        prompt = (f"TASK: plan_app\nAPP: {ctx.job.name}\nSIZE: {size}\n"
+        prompt = (f"TASK: plan_app\nAPP: {ctx.job.name}\nSIZE: {size}\n{stack_note}"
                   f"DESCRIPTION: {spec.get('description', '')}\nREQUESTED_FEATURES:\n{requested}\n\n"
                   f"{SIZE_HINT[size]} Plan AT MOST {budget} feature(s), each a vertical slice. "
                   "Reply ONLY with JSON, no prose. Example shape: "
                   '{"features": [{"id": "todo_model", "title": "Todo model", '
-                  '"files": ["lib/todo.dart", "test/todo_test.dart"]}]}. '
+                  f'"files": {json.dumps(example)}}}]}}. '
                   "Ids are snake_case; files are paths relative to the project root.")
         for _ in range(2):
             reply = ctx.llm.complete(SYSTEM_PROMPT, prompt)
@@ -176,7 +199,8 @@ class PlanApp(Step):
 
 class ImplementParams(StrictParams):
     features: list[Feature]  # usually `${steps.plan.outputs.features}`
-    context_globs: list[str] = Field(default_factory=lambda: ["lib/**/*.dart", "test/**/*.dart"])
+    stack: str | None = None  # default: the job's `stack`
+    context_globs: list[str] | None = None  # default: the stack's sources, tests and manifest
     max_features: int = MAX_FEATURES
     max_context_chars: int = 60_000
 
@@ -192,9 +216,13 @@ class ImplementSpec(Step):
         if len(p.features) > p.max_features:
             return StepResult.failed(f"plan has {len(p.features)} features, budget is {p.max_features}")
         done: list[str] = []
+        profile = optional_profile(ctx, p.stack)
+        globs = p.context_globs or (profile.context_globs if profile else ["**/*"])
+        stack_note = (stacks.guidance(profile, stacks.project_name(ctx.job.name), new_project=True)
+                      if profile else "")
         for feature in p.features:
-            files = collect_files(ctx.repo_dir, [], p.context_globs, p.max_context_chars)
-            prompt = (f"TASK: implement\nAPP: {ctx.job.name}\nFEATURE: {feature.id}\n"
+            files = collect_files(ctx.repo_dir, [], globs, p.max_context_chars)
+            prompt = (f"TASK: implement\nAPP: {ctx.job.name}\n{stack_note}FEATURE: {feature.id}\n"
                       f"TITLE: {feature.title}\nFILES: {', '.join(feature.files)}\n\n"
                       "Implement ONLY this feature, minimally: a few small files and a handful of focused "
                       "tests (not one test per tiny behaviour), reusing what already exists below.\n\n"

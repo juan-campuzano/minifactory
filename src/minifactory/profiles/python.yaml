@@ -1,0 +1,48 @@
+name: python
+description: "Python 3.11+ (standard library only: unittest, argparse). A package under src/, tests under tests/."
+requires: [python3]
+detect: [pyproject.toml, setup.py, setup.cfg, requirements.txt]
+manifest: pyproject.toml
+seed_files:
+  pyproject.toml: |
+    [build-system]
+    requires = ["setuptools>=68"]
+    build-backend = "setuptools.build_meta"
+
+    [project]
+    name = "{name}"
+    version = "0.1.0"
+    requires-python = ">=3.11"
+    dependencies = []
+
+    [tool.setuptools.packages.find]
+    where = ["src"]
+  .gitignore: |
+    __pycache__/
+    *.egg-info/
+    .venv/
+    build/
+    dist/
+commands:
+  # A syntax check that writes nothing: compileall would leave .pyc files in the repo (stale bytecode, and
+  # bytecode in the pull request).
+  analyze: >-
+    python3 -B -c "import ast, pathlib; skip = {'.venv', 'venv', 'node_modules', 'build', '.git'};
+    [ast.parse(f.read_text(), str(f)) for f in pathlib.Path('.').rglob('*.py') if not skip & set(f.parts)]"
+  test: "PYTHONPATH=src:. python3 -B -m unittest discover -s tests"
+  test_files: "PYTHONPATH=src:. python3 -B -m unittest {paths}"
+source_globs: ["src/**/*.py", "*.py"]
+test_globs: ["tests/**/*.py"]
+test_prefixes: ["tests/"]
+repro_test_path: tests/test_factory_repro.py
+file_example: ["src/{name}/cli.py", "tests/test_cli.py"]
+broken_test_patterns: ["SyntaxError", "ModuleNotFoundError", "ImportError"]
+hints: |
+  Tests use the unittest module (files test_*.py under tests/). In a test, import the code under test the
+  same way the existing tests do; the folders src/ and the repository root are on the import path.
+new_project_hints: |
+  Python 3.11+, STANDARD LIBRARY ONLY: no third-party packages and no pip installs.
+  Source under src/{name}/ (with an __init__.py), tests under tests/ using the unittest module
+  (files named test_*.py; tests/__init__.py is not needed). A command-line program goes in
+  src/{name}/cli.py with a main() function and an `if __name__ == "__main__":` guard, plus
+  src/{name}/__main__.py so `python -m {name}` works. Use argparse for arguments.

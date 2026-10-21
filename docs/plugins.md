@@ -56,3 +56,6 @@ Optional capabilities (like `LocalGit.init_repo`) are plain extra methods, check
 - Params are `StrictParams`; unknown keys must fail.
 - Treat anything an LLM returns as untrusted (validate, confine paths, bound loops).
 - Add a test using `fixture`/`scripted` LLM; no network in tests.
+
+## Languages
+A new language is a stack profile, not a plugin: see [`stacks.md`](stacks.md).

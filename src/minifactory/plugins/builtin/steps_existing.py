@@ -4,15 +4,16 @@ in `util`, so a stale or wrong edit is rejected instead of silently clobbering a
 
 from __future__ import annotations
 
-import fnmatch
 import re
 
 from pydantic import Field
 
+from minifactory import stacks
 from minifactory.core.context import Step, StepContext, StrictParams
 from minifactory.core.models import StepResult
 from minifactory.core.registry import register
 
+from .steps_stack import optional_profile
 from .util import (
     SYSTEM_PROMPT,
     PatchError,
@@ -22,6 +23,7 @@ from .util import (
     file_blocks,
     first_json_object,
     git,
+    glob_match,
 )
 
 _WORD = re.compile(r"[a-z0-9]{3,}")
@@ -36,7 +38,8 @@ def _what_it_said(reply: str) -> str:
 
 class LocateParams(StrictParams):
     task: str  # the bug report or feature request
-    globs: list[str] = Field(default_factory=lambda: ["*"])  # which tracked files may be chosen
+    stack: str | None = None  # default: the job's `stack`
+    globs: list[str] | None = None  # which tracked files may be chosen (default: the stack's, else all)
     max_files: int = 8
     max_tree: int = 400  # how many paths the LLM is shown (the most task-relevant ones if there are more)
 
@@ -51,7 +54,9 @@ class LocateFiles(Step):
 
     def run(self, ctx: StepContext, p: LocateParams) -> StepResult:
         tracked = git("ls-files", cwd=ctx.repo_dir).splitlines()
-        tree = [f for f in tracked if any(fnmatch.fnmatch(f, g) for g in p.globs)]
+        profile = optional_profile(ctx, p.stack)
+        globs = p.globs or (profile.context_globs if profile else ["**/*"])
+        tree = [f for f in tracked if any(glob_match(f, g) for g in globs)]
         if not tree:
             return StepResult.failed("no tracked files match the globs")
         if len(tree) > p.max_tree:  # too many to show: keep the paths that share words with the task
@@ -75,6 +80,8 @@ class LocateFiles(Step):
 
 class EditParams(StrictParams):
     instruction: str
+    stack: str | None = None  # default: the job's `stack`; its hints are shown to the LLM
+    tests_only: bool = False  # the edit may only touch the stack's test folders (a reproduction test)
     files: list[str] = Field(default_factory=list)  # context: shown to the LLM in full (often a templated list)
     extra_files: list[str] = Field(default_factory=list)  # more context files, added to `files`
     extra: str = ""  # more context, e.g. the output of a failing test (its tail is kept)
@@ -91,12 +98,20 @@ class Edit(Step):
     needs = ("llm",)
 
     def run(self, ctx: StepContext, p: EditParams) -> StepResult:
+        profile = optional_profile(ctx, p.stack)
+        if p.tests_only and not profile:
+            return StepResult.failed("`tests_only` needs a stack (its test folders define what is allowed)")
+        prefixes = [*p.allowed_prefixes, *(profile.test_prefixes if p.tests_only and profile else [])]
         shown = collect_files(ctx.repo_dir, [*p.files, *p.extra_files], [], p.max_context_chars)
         extra = f"\nADDITIONAL CONTEXT:\n{p.extra[-4000:]}\n" if p.extra else ""
-        prompt = f"TASK: edit\nAPP: {ctx.job.name}\n{p.instruction}\n{extra}\n{file_blocks(ctx.repo_dir, shown)}"
+        name = stacks.project_name(ctx.job.name)
+        stack_note = stacks.guidance(profile, name, new_project=False) if profile else ""
+        where = f"REPRO_TEST_PATH: {profile.repro_test_path}\n" if p.tests_only and profile else ""
+        prompt = (f"TASK: edit\nAPP: {ctx.job.name}\n{stack_note}{where}{p.instruction}\n{extra}\n"
+                  f"{file_blocks(ctx.repo_dir, shown)}")
         reply = ctx.llm.complete(SYSTEM_PROMPT, prompt)
         try:
-            changed = apply_reply(ctx.repo_dir, reply, p.allowed_prefixes or None)
+            changed = apply_reply(ctx.repo_dir, reply, prefixes or None)
         except PatchError as e:
             return StepResult.failed(str(e))
         if not changed:

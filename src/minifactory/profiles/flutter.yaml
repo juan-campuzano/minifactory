@@ -1,0 +1,24 @@
+name: flutter
+description: "Flutter/Dart mobile apps (needs the Flutter SDK). Sources in lib/, widget tests in test/."
+requires: []
+detect: [pubspec.yaml]
+manifest: pubspec.yaml
+scaffold:
+  - "{python} -m minifactory.plugins.builtin.flutter_tool create --project-name {name} --org com.example ."
+commands:
+  analyze: "{python} -m minifactory.plugins.builtin.flutter_tool analyze"
+  test: "{python} -m minifactory.plugins.builtin.flutter_tool test"
+  test_files: "{python} -m minifactory.plugins.builtin.flutter_tool test {paths}"
+source_globs: ["lib/**/*.dart"]
+test_globs: ["test/**/*.dart"]
+test_prefixes: ["test/"]
+repro_test_path: test/factory_repro_test.dart
+file_example: ["lib/todo.dart", "test/todo_test.dart"]
+broken_test_patterns: ["Compilation failed", "Failed to load"]
+hints: |
+  Tests use flutter_test (testWidgets for UI). Import project files as package:<name>/... where <name> is the
+  `name:` in pubspec.yaml.
+new_project_hints: |
+  Flutter (Dart). Application code in lib/ (entry point lib/main.dart), tests in test/ using flutter_test
+  (testWidgets for UI). Import project files with package:<project>/... paths. Use only packages already
+  in pubspec.yaml unless the task cannot be done without one.

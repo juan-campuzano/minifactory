@@ -228,4 +228,4 @@ def test_the_fix_bug_template_is_valid_and_delivers_to_the_repo_itself(tmp_path)
 
     spec = load_workflow(Path(__file__).parent.parent / "src/minifactory/templates/fix-bug/workflow.yaml")
     assert spec.route.delivery == "fixed" and spec.route.intake == "repo-task"
-    assert [s.id for s in spec.steps][:6] == ["guard", "clone", "baseline", "locate", "repro", "repro_fails"]
+    assert [s.id for s in spec.steps][:6] == ["guard", "clone", "detect", "baseline", "locate", "repro"]

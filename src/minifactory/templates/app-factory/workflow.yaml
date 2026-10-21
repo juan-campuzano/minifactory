@@ -1,0 +1,86 @@
+# Creates a NEW software project (an app, a command-line tool, a library) from a short description, in any
+# stack that has a profile (python, node, java, flutter; add your own in stacks/). Needs AWS credentials (Bedrock)
+# and the stack's own tools (e.g. python3, node, javac). Costs LLM tokens.
+
+name: app-factory
+
+route:
+  description: Create a brand-new software project (an app, a command-line tool, a library) from a short description, in a language that has a stack profile
+  not_for:
+    - modifying, fixing or migrating an existing repository
+    - writing or editing a minifactory workflow
+    - a language or platform with no stack profile
+  examples:
+    - a python cli that says hello to a user
+    - a node script that counts the words in a file
+    - a java program that prints the first twenty prime numbers
+    - a simple flutter app to track my expenses
+  needs: a description of what to build; the language or platform may be stated or implied
+  intake: app-spec
+  delivery: choose
+
+source:
+  use: app-specs
+  with: { path: projects }
+
+executor:
+  use: threads
+  with: { workers: 2 }
+
+providers:
+  scm:
+    use: local-dir              # `minifactory ask --output github` swaps this for a new GitHub repo + PR
+    with: { dir: output }
+  llm:
+    use: bedrock
+    with:
+      model_id: "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+      region: us-east-1
+      max_tokens: 16384
+      price_per_mtok: { input: 1.0, output: 5.0 }   # USD per 1M tokens: check current prices
+
+steps:
+  - id: guard
+    use: scm.guard_no_open_pr
+    with: { branch: "factory/${job.name}" }
+
+  - id: init
+    use: scm.init_repo
+
+  # Seeds the project from the stack's profile (stack.scaffold reads ${job.stack}).
+  - id: scaffold
+    use: stack.scaffold
+
+  - id: plan
+    use: agent.plan_app
+
+  - id: implement
+    use: agent.implement_spec
+    with: { features: "${steps.plan.outputs.features}" }
+
+  # Deterministic gates, from the same profile. Red is not fatal yet: the repair loop gets a chance.
+  - id: analyze
+    use: stack.check
+    with: { check: analyze }
+    on_fail: continue
+
+  - id: test
+    use: stack.check
+    with: { check: test }
+    on_fail: continue
+
+  - id: repair
+    use: agent.repair_build
+    when: "steps.analyze.status == 'failed' or steps.test.status == 'failed'"
+    with:
+      checks: [analyze, test]
+      new_project: true          # we created this project: the stack's layout rules apply
+      max_attempts: 4
+      max_unproductive: 2
+
+  - id: deliver
+    use: scm.open_pr
+    with:
+      branch: "factory/${job.name}"
+      title: "feat: ${job.name} (generated)"
+      body: "${job.description}"
