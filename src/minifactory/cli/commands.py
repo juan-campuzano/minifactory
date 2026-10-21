@@ -16,6 +16,7 @@ from . import completion
 from .ask_flow import run_ask
 from .completion_cmd import completion_tip, run_completion
 from .execution import execute
+from .skills_cmd import run_skills
 from .workflows_cmd import resolve_workflow, run_workflows
 
 
@@ -74,6 +75,14 @@ def _parser() -> argparse.ArgumentParser:
     en = wf_sub.add_parser("enable", help="review a drafted workflow and make it active (routable by `ask`)")
     names["workflows.enable.name"] = en.add_argument("name")
     en.add_argument("--yes", action="store_true", help="don't ask for confirmation")
+
+    sk = sub.add_parser("skills", help="skills (SKILL.md guidance) for agent steps: add, list")
+    sk_sub = sk.add_subparsers(dest="skills_cmd", required=True)
+    sk_add = sk_sub.add_parser("add", help="add every skill found in a local path or a GitHub URL (after showing them)")
+    sk_add.add_argument("source", help="a path, or https://github.com/owner/repo[/tree/<branch>/<folder>]")
+    sk_add.add_argument("--global", dest="is_global", action="store_true", help="install for every workspace")
+    sk_add.add_argument("--yes", action="store_true", help="don't ask for confirmation")
+    sk_sub.add_parser("list", help="installed skills")
 
     doc = sub.add_parser("doctor", help="check what is installed and configured; optionally what a workflow needs")
     names["doctor.workflow"] = doc.add_argument(
@@ -169,6 +178,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_workflows(args, ws)
         if args.cmd == "doctor":
             return _doctor(args, ws)
+        if args.cmd == "skills":
+            return run_skills(args, ws)
 
         if args.cmd == "demo-init":
             from minifactory.cli.demo import demo_init

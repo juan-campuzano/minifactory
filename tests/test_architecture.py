@@ -6,7 +6,7 @@ to the right layer, not to edit the test; AGENTS.md ("Where does new code go") e
       support/               helpers shared by plugins (git, shell, edits, text, tls). Not plugins.
       steps/  providers/  routing/     plugins, one folder per kind of thing they are
       tools/                 programs run as subprocesses: standard library only
-    stacks, templates, catalog, review, workspace, ask      domain services (one concern each)
+    stacks, templates, catalog, review, workspace, ask, skills      domain services (one concern each)
     cli/                     the command line and everything that prints
 """
 
@@ -17,7 +17,7 @@ ROOT = Path(__file__).parents[1]
 SRC = ROOT / "src" / "minifactory"
 TESTS = ROOT / "tests"
 
-DOMAIN = {"stacks", "templates", "catalog", "review", "workspace", "ask"}
+DOMAIN = {"stacks", "templates", "catalog", "review", "workspace", "ask", "skills"}
 TOP_LEVEL_MODULES = {"__init__", "__main__", *DOMAIN}
 TOP_LEVEL_PACKAGES = {"cli", "core", "plugins", "profiles", "templates"}
 MAX_LINES = 450  # a module that grows past this wants splitting, not more lines

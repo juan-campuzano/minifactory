@@ -7,7 +7,7 @@ import re
 import shutil
 from typing import Literal
 
-from minifactory import stacks
+from minifactory import skills, stacks
 from minifactory.core.context import Step, StepContext, StrictParams
 from minifactory.core.models import StepResult
 from minifactory.core.registry import register
@@ -23,6 +23,14 @@ def profile_for(ctx: StepContext, name: str | None) -> stacks.StackProfile:
 def optional_profile(ctx: StepContext, name: str | None) -> stacks.StackProfile | None:
     chosen = name or ctx.job.attrs.get("stack")
     return stacks.get(chosen) if chosen else None
+
+
+def skill_note(ctx: StepContext, names: list[str]) -> str:
+    """The prompt text for the step's `skills` (raises skills.SkillError if one is missing or too big)."""
+    note = skills.prompt_block(names)
+    if names:
+        ctx.emit("skills_used", names=list(dict.fromkeys(names)), chars=len(note))
+    return note
 
 
 def missing_tools(profile: stacks.StackProfile) -> str:

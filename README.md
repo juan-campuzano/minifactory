@@ -186,6 +186,20 @@ error: no supported stack matches this request (got 'unsupported'; available: fl
 Add a language by dropping a YAML file in your workspace's `stacks/` folder (field reference in [`docs/stacks.md`](docs/stacks.md)):
 no code needed.
 
+## Skills: reusable guidance for agent steps
+A skill is a `SKILL.md` (YAML frontmatter with `name` and `description`, then markdown) that tells an agent how you want
+something done. Add skills from a path or a GitHub URL; a folder or repository with many skills adds them all:
+```bash
+minifactory skills add ./my-skills
+minifactory skills add https://github.com/owner/repo                        # every SKILL.md in the repo
+minifactory skills add https://github.com/owner/repo/tree/main/skills       # ...or under one folder
+minifactory skills list
+```
+`add` shows each skill (name, description, size) and asks before copying it to `skills/` in your workspace (`--global` for
+all workspaces). Then a step opts in: `agent.edit`, `agent.plan_app`, `agent.implement_spec` and `agent.repair_build` take
+`skills: [tdd, review]`. Only the text is used: scripts next to a `SKILL.md` are not copied and nothing is executed.
+A skill goes into a prompt, so read third-party ones first.
+
 ## Fix a bug in an existing repo
 
 ```bash

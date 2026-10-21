@@ -8,11 +8,11 @@ import re
 
 from pydantic import Field
 
-from minifactory import stacks
+from minifactory import skills, stacks
 from minifactory.core.context import Step, StepContext, StrictParams
 from minifactory.core.models import StepResult
 from minifactory.core.registry import register
-from minifactory.plugins.builtin.steps.stack import optional_profile
+from minifactory.plugins.builtin.steps.stack import optional_profile, skill_note
 from minifactory.plugins.builtin.support.edits import (
     SYSTEM_PROMPT,
     PatchError,
@@ -82,6 +82,7 @@ class EditParams(StrictParams):
     tests_only: bool = False  # the edit may only touch the stack's test folders (a reproduction test)
     files: list[str] = Field(default_factory=list)  # context: shown to the LLM in full (often a templated list)
     extra_files: list[str] = Field(default_factory=list)  # more context files, added to `files`
+    skills: list[str] = Field(default_factory=list)  # installed skills (`minifactory skills add`) shown to the LLM
     extra: str = ""  # more context, e.g. the output of a failing test (its tail is kept)
     allowed_prefixes: list[str] = Field(default_factory=list)  # e.g. ["test/"]: nothing else may change
     commit_message: str = "chore: automated edit"
@@ -104,6 +105,10 @@ class Edit(Step):
         extra = f"\nADDITIONAL CONTEXT:\n{p.extra[-4000:]}\n" if p.extra else ""
         name = stacks.project_name(ctx.job.name)
         stack_note = stacks.guidance(profile, name, new_project=False) if profile else ""
+        try:
+            stack_note += skill_note(ctx, p.skills)
+        except skills.SkillError as e:
+            return StepResult.failed(str(e))
         where = f"REPRO_TEST_PATH: {profile.repro_test_path}\n" if p.tests_only and profile else ""
         prompt = (f"TASK: edit\nAPP: {ctx.job.name}\n{stack_note}{where}{p.instruction}\n{extra}\n"
                   f"{file_blocks(ctx.repo_dir, shown)}")

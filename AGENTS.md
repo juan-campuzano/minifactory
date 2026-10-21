@@ -60,7 +60,7 @@ src/minifactory/
     routing/              routers (jev, keyword) and intakes (app-spec, repo-task, workflow-goal)
     support/              helpers shared by plugins: git, shell, edits (FILE/PATCH protocol), text, tls. Not plugins.
     tools/                programs run as subprocesses (flutter_tool, fake_flutter): standard library only
-  stacks.py templates.py catalog.py review.py workspace.py ask.py     domain services, one concern each
+  stacks.py templates.py catalog.py review.py workspace.py ask.py skills.py     domain services, one concern each
   cli/                  commands.py (parser + dispatch); ask_flow, workflows_cmd, completion_cmd, execution (one module per command family);
                         ui (rich), doctor, completion + shell_setup (tab completion), demo: everything that prints
   profiles/             stack profiles (YAML data)       templates/   packaged workflows + their assets (YAML data)
@@ -164,6 +164,18 @@ toolchain homes (JAVA_HOME, FLUTTER_ROOT...), `MINIFACTORY_*`; NOT AWS_*, API ke
 `with: {env: inherit}` is the old behaviour; `review` flags both. It hides variables, not files: `~/.aws` and `~/.ssh` are still readable, and `support/git.py`
 still passes the whole environment to git itself. The real isolation (OS sandbox such as `srt`/Seatbelt/bubblewrap, or a container) is a future runner
 behind the same port. Verified: python/node/java e2e and real Flutter analyze/test pass under the minimal environment; a secret set in the parent is not visible.
+
+## Skills (text guidance for agent steps)
+`minifactory skills add SOURCE [--global] [--yes]` / `skills list`. `skills.py` (domain) parses SKILL.md (frontmatter `name`+`description` required, body
+non-empty, name `^[a-z][a-z0-9_-]{1,60}$`, 20k chars max), finds every SKILL.md under a tree (skipping `.git`, `node_modules`...), lists the installed ones
+(`<workspace>/skills/<name>/SKILL.md`, then the global folder) and builds the prompt block. `cli/skills_cmd.py` resolves a source: a local path, or a GitHub URL
+(repo, `/tree/<ref>/<folder>`, `/blob/<ref>/<file>`, raw.githubusercontent) cloned shallow into a temp folder; other hosts are refused. It shows each skill,
+asks (or `--yes`), copies ONLY SKILL.md (never overwrites a different installed skill) and reports the files it did not copy. Steps `agent.edit/plan_app/
+implement_spec/repair_build` take `skills: [names]`; `steps/stack.py: skill_note` emits a `skills_used` event. A missing skill or more than 24k chars fails the
+step before any LLM call (never silently cut). A skill is untrusted text that reaches a prompt: the block says it cannot change the reply format, and the
+deterministic gates after the step still decide. Not done: executable skills (need a tool loop + a sandboxed runner), automatic selection (`skills: auto`),
+`skills remove`, refs with a slash in URLs, private repos beyond what plain `git clone` can reach, `validate` does not check skill names (the step fails at run time).
+Verified 2026-10-21 against a real public repo (anthropics/skills `/tree/main/skills`: 16 skills found, installed, listed); the use inside a real LLM run is tested only with a scripted LLM.
 
 ## Doctor (`minifactory doctor`)
 `src/minifactory/cli/doctor.py`: every machine fact goes through `System` (which/run/getenv/has_module/aws), so tests use a fake one. Without a workflow:

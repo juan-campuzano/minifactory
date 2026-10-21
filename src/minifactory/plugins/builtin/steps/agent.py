@@ -7,11 +7,11 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from minifactory import stacks
+from minifactory import skills, stacks
 from minifactory.core.context import Step, StepContext, StrictParams
 from minifactory.core.models import StepResult
 from minifactory.core.registry import register
-from minifactory.plugins.builtin.steps.stack import optional_profile
+from minifactory.plugins.builtin.steps.stack import optional_profile, skill_note
 from minifactory.plugins.builtin.support.edits import (
     SYSTEM_PROMPT,
     PatchError,
@@ -58,6 +58,7 @@ class RepairParams(StrictParams):
     globs: list[str] = Field(default_factory=list)  # e.g. lib/**/*.dart, for dynamic file sets
     max_context_chars: int = 60_000
     context: str = ""  # extra guidance shown with every error report (e.g. the rules the file must follow)
+    skills: list[str] = Field(default_factory=list)  # installed skills (`minifactory skills add`) shown to the LLM
     max_attempts: int = 5
     max_unproductive: int = 2
     commit_message: str = "fix: repair build after migration"
@@ -90,6 +91,10 @@ class RepairBuild(Step):
             return StepResult.failed("repair_build needs `files` and/or `globs` (or a stack)")
         context = p.context or (stacks.guidance(profile, stacks.project_name(ctx.job.name), new_project=p.new_project)
                                 if profile else "")
+        try:
+            context += skill_note(ctx, p.skills)
+        except skills.SkillError as e:
+            return StepResult.failed(str(e))
         rc, out = run_cmd(ctx, verify_cmd, p.timeout)
         unproductive = 0
         for attempt in range(1, p.max_attempts + 1):
@@ -151,6 +156,7 @@ SIZE_HINT = {
 
 class PlanParams(StrictParams):
     stack: str | None = None  # default: the job's `stack`
+    skills: list[str] = Field(default_factory=list)  # installed skills (`minifactory skills add`) shown to the LLM
 
 
 @register("step", "agent.plan_app")
@@ -171,6 +177,10 @@ class PlanApp(Step):
         example = [stacks.render(f, name=name) for f in (profile.file_example if profile else
                                                           ["path/to/source_file", "path/to/test_file"])]
         stack_note = stacks.guidance(profile, name, new_project=True) if profile else ""
+        try:
+            stack_note += skill_note(ctx, p.skills)
+        except skills.SkillError as e:
+            return StepResult.failed(str(e))
         requested = "\n".join(f"- {f}" for f in spec.get("features", []))
         prompt = (f"TASK: plan_app\nAPP: {ctx.job.name}\nSIZE: {size}\n{stack_note}"
                   f"DESCRIPTION: {spec.get('description', '')}\nREQUESTED_FEATURES:\n{requested}\n\n"
@@ -202,6 +212,7 @@ class ImplementParams(StrictParams):
     context_globs: list[str] | None = None  # default: the stack's sources, tests and manifest
     max_features: int = MAX_FEATURES
     max_context_chars: int = 60_000
+    skills: list[str] = Field(default_factory=list)  # installed skills (`minifactory skills add`) shown to the LLM
 
 
 @register("step", "agent.implement_spec")
@@ -219,6 +230,10 @@ class ImplementSpec(Step):
         globs = p.context_globs or (profile.context_globs if profile else ["**/*"])
         stack_note = (stacks.guidance(profile, stacks.project_name(ctx.job.name), new_project=True)
                       if profile else "")
+        try:
+            stack_note += skill_note(ctx, p.skills)
+        except skills.SkillError as e:
+            return StepResult.failed(str(e))
         for feature in p.features:
             files = collect_files(ctx.repo_dir, [], globs, p.max_context_chars)
             prompt = (f"TASK: implement\nAPP: {ctx.job.name}\n{stack_note}FEATURE: {feature.id}\n"
