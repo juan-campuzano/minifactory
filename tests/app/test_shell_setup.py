@@ -170,3 +170,15 @@ def test_init_suggests_the_install_only_in_a_terminal_and_only_while_it_is_missi
     shell_setup.install(shell_setup.plan("zsh"))
     completion_cmd.completion_tip()
     assert capsys.readouterr().out == ""  # already installed: no nagging
+
+
+def test_an_rc_file_we_cannot_write_is_a_clear_error_not_a_traceback(home, capsys):
+    rc = home / ".zshrc"
+    rc.write_text("export FOO=1\n")
+    rc.chmod(0o444)
+    try:
+        assert main(["completion", "install", "--yes"]) == 2
+    finally:
+        rc.chmod(0o644)
+    err = capsys.readouterr().err
+    assert "cannot write" in err and "chown" in err and rc.read_text() == "export FOO=1\n"

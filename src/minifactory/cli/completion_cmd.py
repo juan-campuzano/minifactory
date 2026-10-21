@@ -51,8 +51,14 @@ def run_completion(args: argparse.Namespace) -> int:
         if input(f"{question} [y/N] ").strip().lower() != "y":
             print("not changed")
             return 2
-    for line in shell_setup.install(p) if args.comp_cmd == "install" else shell_setup.uninstall(p):
-        print(f"  {line}")
+    try:
+        for line in shell_setup.install(p) if args.comp_cmd == "install" else shell_setup.uninstall(p):
+            print(f"  {line}")
+    except OSError as e:
+        who = getattr(e, "filename", None) or p.rc_path
+        raise shell_setup.ShellSetupError(
+            f"cannot write {who}: {e.strerror}. Check who owns it (`ls -l {who}`): a file owned by root needs "
+            f"`sudo chown $USER {who}`. Do not run minifactory with sudo") from None
     if args.comp_cmd == "install":
         print(f"Open a new terminal (or run `exec {shell}`) to start using it.")
     return 0
