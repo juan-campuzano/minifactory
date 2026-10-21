@@ -92,6 +92,8 @@ def test_adding_a_folder_with_many_skills_installs_them_all_but_only_the_text(ws
     assert main(["skills", "add", str(many), "--yes"]) == 0
     out = capsys.readouterr().out
     assert sorted(skills.installed()) == ["review", "tdd"]
+    assert not (ws / ".minifactory/skills/review/script.sh").exists()
+    assert (ws / ".minifactory/skills/review/SKILL.md").is_file() and not (ws / "skills").exists()
     assert not (ws / "skills/review/script.sh").exists() and "1 other file(s)" in out and "broken" in out
     assert main(["skills", "add", str(many), "--yes"]) == 0  # idempotent
     assert "already installed" in capsys.readouterr().out
@@ -182,7 +184,17 @@ def test_a_missing_skill_fails_the_step_before_any_llm_call(ws, tmp_path):
 
 def test_too_much_skill_text_fails_instead_of_being_cut(ws, tmp_path):
     for i in range(3):
-        skill_file(ws / "skills", f"big{i}", f"big{i}")
-        (ws / f"skills/big{i}/SKILL.md").write_text(GOOD.format(n=f"big{i}", d="d") + "x" * 9000)
+        skill_file(ws / ".minifactory/skills", f"big{i}", f"big{i}")
+        (ws / f".minifactory/skills/big{i}/SKILL.md").write_text(GOOD.format(n=f"big{i}", d="d") + "x" * 9000)
     result = edit_with(tmp_path / "run", ["big0", "big1", "big2"])
     assert result.status == "failed" and "limit" in result.message
+
+
+def test_skills_dir_can_be_changed_and_init_ignores_only_the_generated_runs(ws, many):
+    (ws / "minifactory.yaml").write_text("schema_version: 1\nskills_dir: team/skills\n")
+    assert main(["skills", "add", str(many), "--yes"]) == 0
+    assert (ws / "team/skills/tdd/SKILL.md").is_file() and sorted(skills.installed()) == ["review", "tdd"]
+    from minifactory import workspace
+
+    workspace.init(ws / "fresh")
+    assert (ws / "fresh/.gitignore").read_text().split() == [".minifactory/runs/", "output/"]  # skills stay committable

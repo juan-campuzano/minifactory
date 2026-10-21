@@ -36,6 +36,7 @@ class FactoryConfig(BaseModel):
     workflows_dir: str = "workflows"
     runs_dir: str = ".minifactory/runs"
     output_dir: str = "output"
+    skills_dir: str = ".minifactory/skills"
     router: str = "jev"
     threshold: float = 0.7
     plugins: list[str] = []
@@ -88,6 +89,7 @@ schema_version: 1
 # workflows_dir: workflows      # your workflows (the ones `minifactory ask` can choose from)
 # runs_dir: .minifactory/runs       # per-job state, events and work directories
 # output_dir: output            # parent folder for `--output local`
+# skills_dir: .minifactory/skills   # skills added with `minifactory skills add` (commit it to share them)
 # router: jev                   # needs TYPESAFE_API_KEY; `keyword` works offline
 # threshold: 0.7                # minimum router confidence to act without asking
 # plugins: []                   # extra python modules that register plugins
@@ -99,7 +101,7 @@ def init(folder: Path) -> list[str]:
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "workflows").mkdir(exist_ok=True)
     created = []
-    for name, content in ((CONFIG_NAME, _CONFIG_TEMPLATE), (".gitignore", ".minifactory/\noutput/\n")):
+    for name, content in ((CONFIG_NAME, _CONFIG_TEMPLATE), (".gitignore", ".minifactory/runs/\noutput/\n")):
         target = folder / name
         if not target.exists():
             target.write_text(content)

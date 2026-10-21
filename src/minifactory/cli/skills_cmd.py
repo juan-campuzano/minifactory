@@ -87,7 +87,8 @@ def _extra_files(skill: skills.Skill) -> int:
 def add(args: argparse.Namespace, ws: workspace.Workspace | None) -> int:
     if ws is None and not args.is_global:
         raise FactoryError("no workspace here. Run `minifactory init` first, or use --global")
-    target = workspace.global_dir() / "skills" if args.is_global else Path.cwd() / "skills"
+    target = (workspace.global_dir() / "skills" if args.is_global or ws is None
+              else ws.root / ws.config.skills_dir)
     with tempfile.TemporaryDirectory(prefix="minifactory-skills-") as scratch:
         found, skipped = _gather(args.source, Path(scratch))
         if not found:

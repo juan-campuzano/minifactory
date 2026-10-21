@@ -1,7 +1,8 @@
 """Skills: reusable written guidance an agent step can be given (`skills: [name]` on `agent.*` steps).
 
 A skill is a folder with a `SKILL.md`: a YAML frontmatter (`name`, `description`) and a markdown body.
-Only that text is used. Skills live in `<workspace>/skills/<name>/SKILL.md` (then the global workspace);
+Only that text is used. Skills live in `<workspace>/.minifactory/skills/<name>/SKILL.md`
+(`skills_dir` in minifactory.yaml; then the global workspace);
 `minifactory skills add` puts them there. A skill is third-party text that ends up in a prompt, so it is
 reviewed when added and its size is bounded when used. It cannot run anything.
 """
@@ -88,7 +89,8 @@ def find_in_tree(root: Path, default_name: str, limit: int = 100) -> tuple[list[
 
 def folders() -> list[Path]:
     """Where installed skills live, most specific first: the workspace's, then the global one."""
-    dirs = [Path.cwd() / "skills"]  # the CLI chdirs to the workspace root
+    ws = workspace.find()  # the CLI chdirs to the workspace root, so relative paths start there
+    dirs = [Path.cwd() / (ws.config.skills_dir if ws else workspace.FactoryConfig().skills_dir)]
     user = workspace.global_dir() / "skills"
     return dirs if user.resolve() in {d.resolve() for d in dirs} else [*dirs, user]
 

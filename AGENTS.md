@@ -138,7 +138,7 @@ command. A gate that cannot fail is worse than no gate: any new check needs a te
 ## Workspace (installable layout)
 Code ships in the package; user content lives in a workspace found like git: nearest `minifactory.yaml` upward from the cwd, else the global
 `$XDG_CONFIG_HOME/minifactory` (default `~/.config/minifactory`), else none (then everything is relative to the cwd, as in development).
-`minifactory.yaml` keys (all optional, `extra=forbid`, `schema_version: 1`): `workflows_dir runs_dir output_dir router threshold plugins`.
+`minifactory.yaml` keys (all optional, `extra=forbid`, `schema_version: 1`): `workflows_dir runs_dir output_dir skills_dir router threshold plugins`.
 Precedence: CLI flag > minifactory.yaml > default. When a workspace is found the CLI `chdir`s to its root, so **relative paths inside a
 workflow resolve from the workspace root**; a file path given on the command line is made absolute first. Workflows also carry
 `schema_version` (only 1 exists). `minifactory workflows copy` skips identical existing files and refuses to overwrite ones you edited.
@@ -168,7 +168,7 @@ behind the same port. Verified: python/node/java e2e and real Flutter analyze/te
 ## Skills (text guidance for agent steps)
 `minifactory skills add SOURCE [--global] [--yes]` / `skills list`. `skills.py` (domain) parses SKILL.md (frontmatter `name`+`description` required, body
 non-empty, name `^[a-z][a-z0-9_-]{1,60}$`, 20k chars max), finds every SKILL.md under a tree (skipping `.git`, `node_modules`...), lists the installed ones
-(`<workspace>/skills/<name>/SKILL.md`, then the global folder) and builds the prompt block. `cli/skills_cmd.py` resolves a source: a local path, or a GitHub URL
+(`<workspace>/.minifactory/skills/<name>/SKILL.md` (`skills_dir`), then `~/.config/minifactory/skills`; `init` git-ignores only `.minifactory/runs/` so skills stay committable) and builds the prompt block. `cli/skills_cmd.py` resolves a source: a local path, or a GitHub URL
 (repo, `/tree/<ref>/<folder>`, `/blob/<ref>/<file>`, raw.githubusercontent) cloned shallow into a temp folder; other hosts are refused. It shows each skill,
 asks (or `--yes`), copies ONLY SKILL.md (never overwrites a different installed skill) and reports the files it did not copy. Steps `agent.edit/plan_app/
 implement_spec/repair_build` take `skills: [names]`; `steps/stack.py: skill_note` emits a `skills_used` event. A missing skill or more than 24k chars fails the

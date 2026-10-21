@@ -195,7 +195,7 @@ minifactory skills add https://github.com/owner/repo                        # ev
 minifactory skills add https://github.com/owner/repo/tree/main/skills       # ...or under one folder
 minifactory skills list
 ```
-`add` shows each skill (name, description, size) and asks before copying it to `skills/` in your workspace (`--global` for
+`add` shows each skill (name, description, size) and asks before copying it to `.minifactory/skills/` in your workspace (`skills_dir` in `minifactory.yaml` changes it; `--global` for
 all workspaces). Then a step opts in: `agent.edit`, `agent.plan_app`, `agent.implement_spec` and `agent.repair_build` take
 `skills: [tdd, review]`. Only the text is used: scripts next to a `SKILL.md` are not copied and nothing is executed.
 A skill goes into a prompt, so read third-party ones first.
