@@ -25,7 +25,7 @@ class EnvSecrets:
             raise KeyError(f"secret '{name}' is not set in the environment") from None
 
 
-# -- target sources: "what should we work on?" (your Neptune query lives here) ----------
+# -- target sources: "what should we work on?" (a database or API query would live here) ----------
 @register("source", "static")
 class StaticSource:
     """A fixed list of jobs written in the workflow itself (`jobs: [{name: ...}]`)."""

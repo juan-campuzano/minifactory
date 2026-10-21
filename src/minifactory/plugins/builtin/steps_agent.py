@@ -64,7 +64,7 @@ class RepairBuild(Step):
 
     max_attempts:      hard cap on LLM calls.
     max_unproductive:  consecutive attempts that neither fixed the build nor changed
-                       the error (anti-loop). Mirrors your COPILOT_MAX_* budgets.
+                       the error (anti-loop).
     """
 
     Params = RepairParams
@@ -122,7 +122,7 @@ class AppPlan(BaseModel):
     features: list[Feature] = Field(min_length=1, max_length=MAX_FEATURES)
 
 
-# How many features a plan may have, by the size the user asked for ("una app mínima" != "una app completa").
+# How many features a plan may have, by the size the user asked for ("a minimal app" is not "a full-featured app").
 SIZE_BUDGET = {"minimal": 2, "standard": 5, "full": MAX_FEATURES - 2}
 SIZE_HINT = {
     "minimal": "A minimal app: one or two screens at most. Prefer a SINGLE feature that holds the screen, "

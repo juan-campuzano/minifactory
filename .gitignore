@@ -10,3 +10,7 @@ output/
 build/
 dist/
 .DS_Store
+
+# a developer workspace used from the repo root
+/workflows/
+/minifactory.yaml

@@ -1,6 +1,6 @@
 """Ports: everything environment-specific lives behind these interfaces.
 
-The core only knows these Protocols. Neptune, Azure DevOps, the STS assume-role dance,
+The core only knows these Protocols. A graph query, a git host, a cross-account secrets lookup,
 AWS Batch... are all *implementations* that plugins register.
 """
 

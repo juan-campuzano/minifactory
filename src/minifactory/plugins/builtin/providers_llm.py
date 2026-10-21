@@ -1,5 +1,5 @@
 """LLM providers. `openai` is the real thing (any OpenAI-compatible gateway, like your
-LiteLLM one); `scripted` is a deterministic fake so you can test the whole factory
+gateway of your choice); `scripted` is a deterministic fake so you can test the whole factory
 offline, with no tokens and no flakiness."""
 
 from __future__ import annotations

@@ -190,12 +190,12 @@ def test_expect_failure_accepts_a_red_command_only(tmp_path):
 
 # -- the intake and the ask flow ----------------------------------------------------------------
 def test_repo_task_intake_builds_a_safe_job():
-    job = RepoTaskIntake().build("arregla en acme/calc: add(2,3) da -1", BugLLM())
+    job = RepoTaskIntake().build("fix in acme/calc: add(2,3) gives -1", BugLLM())
     assert job.name == "acme/calc" and "/" not in job.id and job.attrs["branch"].startswith("factory/fix-")
     assert job.attrs["task"] == BUG
 
 
-@pytest.mark.parametrize("request_text", ["arregla el bug de la suma", "arregla en otro/repo la suma"])
+@pytest.mark.parametrize("request_text", ["fix the bug in the sum", "fix the sum in some/other repo"])
 def test_repo_task_intake_needs_a_repo_the_user_actually_wrote(request_text):
     with pytest.raises(ValueError, match="owner/name|does not appear"):
         RepoTaskIntake().build(request_text, BugLLM())

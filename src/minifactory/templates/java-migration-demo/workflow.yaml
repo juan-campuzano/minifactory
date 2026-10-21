@@ -1,4 +1,4 @@
-# A miniature version of the codemod worker flow, expressed as data.
+# A miniature batch migration expressed as data: toy repos below a target Java version are upgraded.
 # Run from the project root:  minifactory demo-init && minifactory run workflows/java-migration-demo.yaml
 
 name: java-migration-demo
@@ -6,7 +6,7 @@ name: java-migration-demo
 vars:
   target_java: "21"
 
-# What to work on (stand-in for the Neptune query "repos below the Java target").
+# What to work on (stand-in for a query such as "repos below the Java target").
 source:
   use: catalog
   with: { path: demo/catalog.json, below: 21 }
@@ -19,10 +19,10 @@ executor:
 # Environment-specific things live behind ports. Swap these to change the world.
 providers:
   scm:
-    use: local-git              # later: azure-devops, github
+    use: local-git              # later: github
     with: { remotes_dir: demo/remote, prs_dir: demo/prs }
   llm:
-    use: scripted               # later: openai (your LiteLLM gateway)
+    use: scripted               # later: openai (any compatible gateway)
   secrets:
     use: env                    # later: aws-sts-secrets (cross-account assume-role)
 

@@ -1,4 +1,4 @@
-"""SCM provider backed by plain local git repos. Same port an AzureDevOps or GitHub
+"""SCM provider backed by plain local git repos. Same port any other git host or GitHub
 provider would implement; swapping it is a one-line change in the workflow YAML."""
 
 from __future__ import annotations

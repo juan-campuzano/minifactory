@@ -121,7 +121,7 @@ def test_flutter_step_without_the_sdk_fails_with_a_clear_message(monkeypatch, tm
     assert result.status == "failed" and "flutter" in result.message
 
 
-# -- plan size: "una app minima" must not become eight features --------------------------------
+# -- plan size: "a minimal app" must not become eight features --------------------------------
 class SeqLLM:
     def __init__(self, *replies):
         self.replies, self.prompts = list(replies), []

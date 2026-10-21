@@ -1,4 +1,4 @@
-"""Creates a sandbox for the demo: bare git 'remotes', a catalog (the Neptune stand-in)
+"""Creates a sandbox for the demo: bare git 'remotes', a catalog (a stand-in for a real job source)
 and an empty PR folder. Six toy microservices, each exercising a different path."""
 
 from __future__ import annotations

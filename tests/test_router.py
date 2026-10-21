@@ -90,7 +90,7 @@ def test_discover_survives_one_broken_file(wf_dir):
 
 # -- routers ---------------------------------------------------------------------------------
 def test_keyword_router_picks_by_overlap_and_says_none_when_nothing_matches():
-    d = KeywordRouter().choose("quiero crear an app to track my expenses", CANDIDATES)
+    d = KeywordRouter().choose("i want to create an app to track my expenses", CANDIDATES)
     assert d.choice == "mobile-app"
     assert KeywordRouter().choose("zzz qqq", CANDIDATES).choice is None
 
@@ -251,7 +251,7 @@ def test_ask_without_output_and_without_a_terminal_asks_for_the_flag(wf_dir, cap
 
 def test_app_spec_intake_carries_the_size_and_defaults_to_standard():
     mini = LLM('{"name": "counter", "description": "A minimal counter app.", "features": [], "size": "minimal"}')
-    assert AppSpecIntake().build("una app minima", mini).attrs["size"] == "minimal"
+    assert AppSpecIntake().build("a minimal app", mini).attrs["size"] == "minimal"
     plain = LLM('{"name": "counter", "description": "A counter app.", "features": []}')
     assert AppSpecIntake().build("an app", plain).attrs["size"] == "standard"
     bad = LLM('{"name": "counter", "description": "A counter app.", "features": [], "size": "huge"}')

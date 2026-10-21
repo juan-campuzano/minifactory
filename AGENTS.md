@@ -7,8 +7,8 @@ Tool-specific files (CLAUDE.md, GEMINI.md...) should not exist; if one is needed
 `minifactory`: a small engine that runs **declarative workflows** (YAML) made of **plugin steps** over a queue of
 **jobs**. Environment-specific things (git host, LLM, secrets, where jobs run, what to work on) sit behind **ports**.
 Packaged templates (`src/minifactory/templates/<name>/`): `flutter-app-factory` (offline demo: fixture LLM + fake flutter),
-`flutter-app-factory-bedrock` (real: Bedrock + real Flutter; the one `ask` uses) and `java-migration-demo` (a miniature of the
-real codemod). They are copied into a workspace; the package itself never runs from its own folders.
+`flutter-app-factory-bedrock` (real: Bedrock + real Flutter; the one `ask` uses) and `java-migration-demo` (a miniature batch
+migration: toy repos, a baseline gate, a repair loop). They are copied into a workspace; the package itself never runs from its own folders.
 
 ## Commands
 ```bash
@@ -28,7 +28,7 @@ FACTORY_FLUTTER=fake minifactory run ...                # simulated flutter (tes
 ```
 
 ## Free text -> workflow (`minifactory ask`)
-`minifactory ask "quiero una app para llevar mis gastos" [--dry-run] [--yes] [--threshold 0.7] [--router jev|keyword]`
+`minifactory ask "a simple app to track my expenses" [--dry-run] [--yes] [--threshold 0.7] [--router jev|keyword]`
 1. `discover` loads the workspace's `workflows/*.yaml` (then `~/.config/minifactory/workflows`; packaged templates are NOT routable until copied) that have a `route:` block (description, not_for, examples, needs, intake). No block = not routable.
 2. A `router` plugin (`jev` = TypeSafe Jev via HTTP, needs `TYPESAFE_API_KEY`; `keyword` = offline) returns a `Decision`
    (choice or None, confidence, probabilities, actionable). For Jev, `actionable` comes from one Noul per workflow built from its
@@ -63,7 +63,7 @@ To make a workflow routable: add `route:` and, if its input isn't an app spec, r
 - Run artifacts: `.minifactory/runs/<workflow>/<job>/{state.json,result.json,work/}` and `events.jsonl`. Generated, git-ignored.
 
 ## Changing existing repositories (`fix-bug` template)
-`minifactory ask "arregla X en owner/repo: ..."` -> router -> `repo-task` intake (needs `owner/name` literally in the text; the LLM only extracts it,
+`minifactory ask "fix X in owner/repo: ..."` -> router -> `repo-task` intake (needs `owner/name` literally in the text; the LLM only extracts it,
 and a repo that does not appear in the request is rejected) -> workflow `route.delivery: fixed` (no `--output`: it always opens a PR on that repo).
 Steps: guard -> clone -> baseline (`flutter.analyze`, discard if red) -> `agent.locate_files` (LLM *selects* from `git ls-files`; invented paths are
 dropped) -> `agent.edit` writes ONE repro test (`allowed_prefixes: [test/]`) -> `expect_failure` gate (a passing test, a missing SDK, a timeout or a
@@ -154,7 +154,7 @@ pubspec, no platform folders) and its analyze/test prove nothing. the `flutter-a
 `flutter-app-factory-bedrock` uses the real SDK. Lesson learned 2026-10-20: a default of fake shipped a fake project to GitHub.
 
 ## App size (`size` in the spec)
-`minimal | standard | full` (default standard). The `app-spec` intake infers it from the request ("minima", "simple" -> minimal).
+`minimal | standard | full` (default standard). The `app-spec` intake infers it from the request ("minimal", "simple" -> minimal).
 `agent.plan_app` turns it into a feature budget in code (`SIZE_BUDGET`: 2 / 5 / 8) and tells the LLM; an oversized plan gets ONE retry with
-the limit spelled out, then fails rather than overbuild. Measured 2026-10-20 (Haiku 4.5, real Flutter, same request "una app minima con un
-contador..."): before 5 features / 25 tests / 1 repair; after 1 feature / 3 tests / no repair, 2 LLM calls, ~$0.009.
+the limit spelled out, then fails rather than overbuild. Measured 2026-10-20 (Haiku 4.5, real Flutter, same request "a minimal app with a
+counter..."): before 5 features / 25 tests / 1 repair; after 1 feature / 3 tests / no repair, 2 LLM calls, ~$0.009.

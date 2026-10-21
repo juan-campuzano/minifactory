@@ -19,10 +19,10 @@ executor:
 
 providers:
   scm:
-    use: local-git              # later: azure-devops, github
+    use: local-git              # later: github
     with: { remotes_dir: demo-flutter/remote, prs_dir: demo-flutter/prs }
   llm:
-    use: fixture                # later: openai (your LiteLLM gateway)
+    use: fixture                # later: openai (any compatible gateway)
     with: { path: fixtures/flutter }
 
 steps:

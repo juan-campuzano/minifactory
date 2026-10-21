@@ -11,7 +11,7 @@ route:
     - adding a new feature to an existing repository
     - upgrading or migrating versions
   examples:
-    - arregla el crash del login en acme/todo_app
+    - fix the crash on login in acme/todo_app
     - fix the null error when the list is empty in acme/todo_app
   needs: the GitHub repository as owner/name and a description of the wrong behaviour
   intake: repo-task
