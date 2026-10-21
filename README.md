@@ -34,6 +34,9 @@ The rule that keeps it from becoming spaghetti: **the core never imports a plugi
 
 ## Install
 
+> **Pre-release.** `0.0.2a1` is an alpha: `pip` and `uv` skip pre-releases unless you ask, so a plain install still gets `0.0.1`.
+> To try the alpha: `uv tool install --prerelease allow minifactory` or `pip install --pre minifactory`.
+
 The easiest way to get the `minifactory` command is a tool installer, which keeps it isolated and on your `PATH`:
 
 ```bash
