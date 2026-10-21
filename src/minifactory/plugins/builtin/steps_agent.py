@@ -107,7 +107,7 @@ class RepairBuild(Step):
                 ctx.emit("repair_patch_rejected", attempt=attempt, error=str(e))
             if edits:
                 commit_all(ctx.repo_dir, p.commit_message)
-            new_rc, new_out = run_shell(p.verify_cmd, ctx.repo_dir, p.timeout)
+            new_rc, new_out = run_shell(verify_cmd, ctx.repo_dir, p.timeout)
             progressed = bool(edits) and (new_rc == 0 or new_out != out)
             unproductive = 0 if progressed else unproductive + 1
             ctx.emit("repair_attempt", attempt=attempt, edits=len(edits), green=new_rc == 0)

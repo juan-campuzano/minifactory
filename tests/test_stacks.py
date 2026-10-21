@@ -367,3 +367,38 @@ def test_layout_rules_reach_new_projects_but_never_existing_repositories():
     assert "STANDARD LIBRARY ONLY" in fresh and "src/hello_cli/" in fresh
     for profile in stacks.available().values():  # every stack tells existing-repo agents how its tests are written
         assert profile.hints.strip(), profile.name
+
+
+class UselessRepairLLM(StackLLM):
+    """Writes broken code, then 'repairs' it with more broken code."""
+
+    def complete(self, system, prompt):
+        StackLLM.seen.append(prompt)
+        if "TASK: plan_app" in prompt:
+            return json.dumps(PLAN["python"])
+        return blocks("python", **{"src/hello_cli/cli.py": "def greet(:\n    pass"})
+
+
+registry.register("llm", "t.useless")(type("UselessRepairProvider", (UselessRepairLLM,), {"__init__": lambda s: None}))
+
+
+@pytest.mark.skipif(not has("python"), reason="python3 not installed")
+def test_a_repair_that_does_not_fix_anything_is_reported_as_a_failure_not_as_green(factory_ws):
+    """Regression: the loop re-ran `p.verify_cmd` (empty when using stack checks), so every attempt looked green."""
+    data = yaml.safe_load((factory_ws / "workflows" / "app-factory.yaml").read_text())
+    data["providers"]["llm"] = {"use": "t.useless"}
+    data["providers"]["scm"] = {"use": "local-dir", "with": {"dir": str(factory_ws / "out")}}
+    spec = WorkflowSpec.model_validate(data)
+    job = Job(id="hello_cli", name="hello_cli", attrs={"description": "A tiny program.", "features": [],
+                                                       "size": "minimal", "stack": "python"})
+    result = Engine(spec, factory_ws / ".minifactory" / "runs").run_job(job)
+    status = {s.id: s.status for s in result.steps}
+    assert status["analyze"] == "failed" and status["repair"] == "failed", status
+    assert result.outcome == "failed" and not (factory_ws / "out" / "hello_cli").exists()  # nothing delivered
+
+
+def test_an_empty_command_never_counts_as_a_passing_check(tmp_path):
+    from minifactory.plugins.builtin.util import run_shell
+
+    rc, out = run_shell("   ", tmp_path)
+    assert rc != 0 and "empty command" in out

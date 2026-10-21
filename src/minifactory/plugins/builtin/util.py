@@ -34,6 +34,8 @@ def commit_all(repo_dir: Path, message: str) -> bool:
 
 
 def run_shell(cmd: str, cwd: Path, timeout: int = 120) -> tuple[int, str]:
+    if not cmd.strip():  # `sh -c ""` exits 0: an empty check would pass anything
+        return 2, "refusing to run an empty command"
     # Commands may do `python -m minifactory...`; make that work without an installed package.
     src_root = Path(__file__).resolve().parents[3]
     extra = [str(src_root)] if src_root.name == "src" else []  # only a source checkout needs this

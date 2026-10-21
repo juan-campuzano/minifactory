@@ -106,6 +106,10 @@ when it finds no tests; the Dart bias came from `agent.plan_app`'s hardcoded `li
 Verified with Haiku 4.5 and the real toolchains: python CLI, node script and java program created and passing their own checks; a python bug fixed
 with a one-line change + regression test; `cobol` rejected. Not verified: Maven/Gradle (no profile), sandboxing (see gaps).
 
+Lesson (2026-10-21): `agent.repair_build` re-ran `p.verify_cmd` after each edit, which is EMPTY when a stack's `checks` are used, and `sh -c ""` exits 0, so every
+repair looked green without verifying anything (affects 0.0.2a1's `app-factory` and `fix-bug`). Fixed (re-run the computed command) and `run_shell` now refuses an empty
+command. A gate that cannot fail is worse than no gate: any new check needs a test where the thing it checks is WRONG and the step must fail.
+
 ## Workspace (installable layout)
 Code ships in the package; user content lives in a workspace found like git: nearest `minifactory.yaml` upward from the cwd, else the global
 `$XDG_CONFIG_HOME/minifactory` (default `~/.config/minifactory`), else none (then everything is relative to the cwd, as in development).
