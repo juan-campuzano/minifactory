@@ -61,7 +61,8 @@ src/minifactory/
     support/              helpers shared by plugins: git, shell, edits (FILE/PATCH protocol), text, tls. Not plugins.
     tools/                programs run as subprocesses (flutter_tool, fake_flutter): standard library only
   stacks.py templates.py catalog.py review.py workspace.py ask.py     domain services, one concern each
-  cli/                  commands.py (argparse + dispatch), ui.py (rich), doctor.py, demo.py: everything that prints
+  cli/                  commands.py (parser + dispatch); ask_flow, workflows_cmd, completion_cmd, execution (one module per command family);
+                        ui (rich), doctor, completion + shell_setup (tab completion), demo: everything that prints
   profiles/             stack profiles (YAML data)       templates/   packaged workflows + their assets (YAML data)
 tests/                  core/  plugins/  app/ mirror the code; test_architecture.py enforces the rules below
 assets/brand/           logo kit (python3 assets/brand/_build/build.py regenerates it). README images use ABSOLUTE
@@ -144,12 +145,16 @@ workflow resolve from the workspace root**; a file path given on the command lin
 `run_shell` adds `src/` to `PYTHONPATH` only for a source checkout.
 
 ## Shell completion
-`minifactory completion {bash,zsh,fish}` prints the argcomplete script; Tab runs the program itself with `_ARGCOMPLETE` set. `cli/completion.py` holds the
+`minifactory completion {show,install,uninstall,status}`. Tab runs the program itself with `_ARGCOMPLETE` set (argcomplete). `cli/completion.py` holds the
 completers (workflow names from the workspace, templates, drafts, routers; a path only once you start typing one) and `attach()` hooks them onto the parser
 (`names` dict in `_parser()`). Rules: a completer never raises or prints (`_safely`), never `chdir`s (it uses `workspace.find()`), and argcomplete is not
-imported unless `_ARGCOMPLETE` is set (a test checks it: a normal run must stay at ~90 ms). Flags are offered only after a dash (`always_complete_options=False`).
-In tests argcomplete's debug stream must be swapped for stderr: by default it opens fd 9, which is pytest's faulthandler fd, and closing it breaks the session.
-Verified: the real protocol in a workspace, the script loading in zsh 5 (registers `_python_argcomplete`) and bash 3.2 (needs `eval`, not `source <()`). Not verified: fish.
+imported unless `_ARGCOMPLETE` is set (a test checks it: a normal run must stay at ~90 ms). Flags are offered only after a dash.
+`cli/shell_setup.py` does `install`: it writes the script to `<config>/minifactory/completion/` and adds ONE marked block (`# >>> minifactory completion >>>`)
+to the rc file, so shell startup runs no python; idempotent, one-time `.minifactory-backup`, `uninstall` restores the file exactly, fish needs no rc edit.
+It honours `ZDOTDIR` and `XDG_CONFIG_HOME`: tests MUST redirect HOME, ZDOTDIR and XDG_CONFIG_HOME or they would edit real dotfiles (a dry run once showed
+the real ~/.zshrc because only HOME had been changed). Nothing is automatic: pip/uv run no post-install hook; `doctor` and `init` only point to the command.
+In tests argcomplete's debug stream must be swapped for stderr (it opens fd 9, pytest's faulthandler fd). Verified: the real protocol in a workspace, the
+installed block loading in a real zsh (even without compinit) and bash 3.2 (needs `eval`/file sourcing, not `source <()`). Not verified: fish.
 
 ## Runner (how commands run)
 Port `Runner.run(cmd, cwd, timeout) -> (rc, output)` (core/ports.py); a workflow picks one with `runner: {use: host}` (default). Steps NEVER spawn

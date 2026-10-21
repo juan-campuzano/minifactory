@@ -20,6 +20,7 @@ class FakeSystem(doctor.System):
         self.tools = tools or {}
         self.envvars = env or {}
         self.boto3, self._aws, self.gh_code, self.aws_error = boto3, aws, gh_code, aws_error
+        self.completion_state = ("zsh", "installed")
 
     def which(self, name):
         return f"/fake/bin/{name}" if name in self.tools else None
@@ -39,6 +40,9 @@ class FakeSystem(doctor.System):
         if self.aws_error:
             raise self.aws_error
         return self._aws
+
+    def completion(self):
+        return self.completion_state
 
     def aws_identity(self):
         return doctor.mask_arn("arn:aws:iam::123456789012:user/juan")
@@ -179,3 +183,19 @@ def test_doctor_for_a_workflow_checks_it_and_an_unknown_name_is_a_clear_error(tm
     capsys.readouterr()
     assert main(["doctor", "nope"]) == 2
     assert "not found" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("state, status, hint", [
+    (("zsh", "installed"), "ok", False), (("zsh", "stale"), "warn", True), (("zsh", "missing"), "info", True)])
+def test_doctor_reports_whether_tab_completion_is_installed(state, status, hint):
+    system = FakeSystem(tools=FULL)
+    system.completion_state = state
+    check = by_name(doctor.run_checks(system, None))[("minifactory", "tab completion")]
+    assert check.status == status and bool(check.hint) == hint
+    assert "completion install" in check.hint or not hint
+
+
+def test_doctor_says_nothing_about_completion_for_a_shell_we_do_not_support():
+    system = FakeSystem(tools=FULL)
+    system.completion_state = (None, None)
+    assert ("minifactory", "tab completion") not in by_name(doctor.run_checks(system, None))

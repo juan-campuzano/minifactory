@@ -8,11 +8,15 @@ from pathlib import Path
 from minifactory import templates, workspace
 from minifactory.core import registry
 from minifactory.core.engine import Engine
-from minifactory.core.errors import FactoryError, RoutingError, VagueRequest
-from minifactory.core.events import ConsoleSink, EventBus
+from minifactory.core.errors import FactoryError
+from minifactory.core.events import EventBus
 from minifactory.core.workflow import load_workflow
 
 from . import completion
+from .ask_flow import run_ask
+from .completion_cmd import completion_tip, run_completion
+from .execution import execute
+from .workflows_cmd import resolve_workflow, run_workflows
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -78,149 +82,24 @@ def _parser() -> argparse.ArgumentParser:
     doc.add_argument("--json", action="store_true", help="machine-readable output")
     doc.add_argument("--plugin", action="append", default=[])
 
-    comp = sub.add_parser("completion", help="print the tab-completion script for your shell (bash, zsh or fish)")
-    comp.add_argument("shell", choices=completion.SHELLS)
+    comp = sub.add_parser("completion", help="tab completion: install it, or print its script")
+    comp_sub = comp.add_subparsers(dest="comp_cmd", required=True)
+    show = comp_sub.add_parser("show", help="print the completion script for a shell")
+    show.add_argument("shell", choices=completion.SHELLS)
+    for name, text in (("install", "enable tab completion in your shell (asks before editing your rc file)"),
+                       ("uninstall", "remove what `install` added"),
+                       ("status", "is tab completion installed and up to date?")):
+        cp_ = comp_sub.add_parser(name, help=text)
+        cp_.add_argument("--shell", choices=completion.SHELLS, help="default: from $SHELL")
+        if name != "status":
+            cp_.add_argument("--yes", action="store_true", help="don't ask for confirmation")
+        if name == "install":
+            cp_.add_argument("--dry-run", action="store_true", help="show what would change, change nothing")
 
     demo = sub.add_parser("demo-init", help="create the demo sandbox (git remotes + catalog)")
     demo.add_argument("--dir", default="demo")
     completion.attach(names)
     return p
-
-
-def _summary(results) -> None:
-    print("\n" + "─" * 78)
-    print(f"{'JOB':<22} {'OUTCOME':<10} DETAIL")
-    for r in results:
-        pr = r.artifacts[0].ref if r.artifacts else ""
-        detail = pr or r.reason
-        print(f"{r.job_id:<22} {r.outcome:<10} {detail}")
-        for note in r.notes:
-            print(f"{'':<33} note: {note}")
-    counts = {o: sum(r.outcome == o for r in results) for o in ("succeeded", "failed", "discarded")}
-    print("─" * 78)
-    print("  ".join(f"{k}: {v}" for k, v in counts.items()))
-
-
-def _execute(engine: Engine, bus: EventBus, jobs, args) -> None:
-    """Run jobs with the live board on a terminal, plain lines otherwise."""
-
-    def run_one(job):
-        return engine.run_job(job, resume=getattr(args, "resume", False))
-
-    spec = engine.spec
-    if sys.stdout.isatty() and not args.plain:
-        from minifactory.cli.ui import LiveBoard, banner
-
-        board = LiveBoard([j.id for j in jobs], [s.id for s in spec.steps])
-        banner(board.console)
-        board.console.print(f"[bold]{spec.name}[/]  ·  {len(jobs)} job(s)\n")
-        bus.subscribe(board)
-        with board:
-            results = engine.executor.run(jobs, run_one)
-        board.summary(results)
-        return
-
-    if not getattr(args, "quiet", False):
-        bus.subscribe(ConsoleSink())
-    print(f"workflow '{spec.name}': {len(jobs)} job(s)")
-    results = engine.executor.run(jobs, run_one)
-    _summary(results)
-
-
-def _pick_output(console, args) -> str | None:
-    console.print(f"Where should the result go?\n  1. local folder ({args.output_dir}/<name>)\n"
-                  f"  2. a new {'PUBLIC' if args.public else 'private'} GitHub repository + pull request")
-    answer = input("Choose 1 or 2 (empty to abort): ").strip()
-    if answer not in ("1", "2"):
-        console.print("aborted")
-        return None
-    return "local" if answer == "1" else "github"
-
-
-def _ask(args) -> int:
-    from rich.console import Console
-
-    from minifactory import ask as R
-    from minifactory.cli.ui import show_decision, show_spec
-
-    console = Console()
-    routables = R.discover(args.workflow_dirs)
-    router = registry.get("router", args.router)()
-    decision = router.choose(args.request, [r.candidate for r in routables.values()])
-    show_decision(console, decision, args.threshold)
-    if decision.usage:
-        console.print(f"[dim]router tokens: {decision.usage}[/]")
-
-    interactive = sys.stdin.isatty() and not args.yes
-    try:
-        R.check(decision, args.threshold)
-        choice = decision.choice
-    except VagueRequest as problem:
-        if not interactive:
-            raise
-        console.print(f"[yellow]{problem}[/] (you can still review the drafted input below)")
-        choice = decision.choice
-    except RoutingError as problem:
-        ranking = [n for n, _ in R.ranked(decision) if n in routables]
-        if not interactive or not ranking:
-            raise
-        console.print(f"[yellow]{problem}[/]")
-        for i, name in enumerate(ranking, 1):
-            console.print(f"  {i}. {name}")
-        answer = input("Pick a workflow number (empty to abort): ").strip()
-        if not answer.isdigit() or not 1 <= int(answer) <= len(ranking):
-            console.print("aborted")
-            return 2
-        choice = ranking[int(answer) - 1]
-
-    chosen = routables[choice]
-    drafting = Engine(chosen.spec, args.runs_dir, EventBus())  # only for its llm provider
-    engine = drafting
-    if engine.llm is None:
-        raise RoutingError(f"workflow '{chosen.spec.name}' has no llm provider to draft its input")
-    intake = registry.get("intake", chosen.spec.route.intake)()
-    try:
-        job = intake.build(args.request, engine.llm)
-    except ValueError as e:
-        raise RoutingError(str(e)) from None
-    show_spec(console, chosen.spec.name, job)
-
-    output = args.output
-    if chosen.spec.route.delivery == "fixed":
-        if output:
-            raise RoutingError("this workflow delivers to the repository itself; --output does not apply")
-        bus = EventBus()
-        engine = Engine(chosen.spec, args.runs_dir, bus)
-        describe = getattr(engine.scm, "target", lambda repo: repo)  # `target` is optional on providers
-        console.print(f"[bold]delivery →[/] {describe(job.name)}")
-        if args.dry_run:
-            return 0
-        if not args.yes and (not sys.stdin.isatty() or input("Run it? [y/N] ").strip().lower() != "y"):
-            console.print("not run (confirm interactively or pass --yes)")
-            return 2
-        _execute(engine, bus, [job], args)
-        return 0
-    if output is None and not args.dry_run:
-        if not interactive:
-            raise RoutingError("choose where the result goes: --output local|github")
-        output = _pick_output(console, args)
-        if output is None:
-            return 2
-    bus = EventBus()
-    if output:
-        spec = R.with_output(chosen.spec, output, output_dir=args.output_dir, owner=args.owner,
-                             public=args.public)
-        engine = Engine(spec, args.runs_dir, bus)
-        console.print(f"[bold]output →[/] {engine.scm.target(job.name)}")
-        if output == "github" and args.public:
-            console.print("[bold red]this repository will be PUBLIC[/]")
-    if args.dry_run:
-        return 0
-    if not args.yes and (not sys.stdin.isatty() or input("Run it? [y/N] ").strip().lower() != "y"):
-        console.print("not run (confirm interactively or pass --yes)")
-        return 2
-    _execute(engine, bus, [job], args)
-    return 0
 
 
 def _use_workspace(args: argparse.Namespace) -> workspace.Workspace | None:
@@ -250,49 +129,10 @@ def _use_workspace(args: argparse.Namespace) -> workspace.Workspace | None:
     return ws
 
 
-def _resolve_workflow(name: str, dirs: list[Path]) -> str:
-    """A path to a .yaml, or the name of a workflow in the workspace folders."""
-    if Path(name).is_file():
-        return name
-    for folder in dirs:
-        for candidate in (folder / name, folder / f"{name}.yaml"):
-            if candidate.is_file():
-                return str(candidate)
-    known = sorted(f.stem for folder in dirs for f in folder.glob("*.yaml"))
-    hint = f"your workflows: {', '.join(known)}" if known else "no workflows found"
-    ready = ", ".join(templates.available())
-    raise FactoryError(f"workflow '{name}' not found ({hint}). Templates you can copy: {ready}. "
-                       "See `minifactory workflows list`")
-
-
-def _enable(args: argparse.Namespace, ws: workspace.Workspace | None) -> int:
-    """Show what a drafted workflow would do, then move it into the active workflows folder."""
-    from minifactory.review import review
-
-    if ws is None:
-        raise FactoryError("no workspace here. Run `minifactory init` first")
-    folder = ws.root / ws.config.workflows_dir
-    draft, target = folder / "drafts" / f"{args.name}.yaml", folder / f"{args.name}.yaml"
-    if not draft.is_file():
-        raise FactoryError(f"no draft named '{args.name}' in {draft.parent}")
-    if target.exists():
-        raise FactoryError(f"{target} already exists; remove or rename one of them first")
-    spec = load_workflow(draft)  # a draft written under other plugins may no longer validate
-    print(f"workflow '{spec.name}' ({len(spec.steps)} steps) would be enabled. Review:")
-    for finding in review(spec):
-        print(f"  {finding}")
-    if not args.yes and (not sys.stdin.isatty() or input("Enable it? [y/N] ").strip().lower() != "y"):
-        print("not enabled (confirm interactively or pass --yes)")
-        return 2
-    draft.rename(target)
-    print(f"enabled: {target.relative_to(ws.root)}")
-    return 0
-
-
 def _doctor(args: argparse.Namespace, ws: workspace.Workspace | None) -> int:
     from minifactory.cli import doctor
 
-    spec = load_workflow(_resolve_workflow(args.workflow, args.workflow_dirs)) if args.workflow else None
+    spec = load_workflow(resolve_workflow(args.workflow, args.workflow_dirs)) if args.workflow else None
     checks = doctor.run_checks(doctor.System(), ws, workflow=spec, online=args.online)
     if args.json:
         import json
@@ -305,44 +145,13 @@ def _doctor(args: argparse.Namespace, ws: workspace.Workspace | None) -> int:
     return doctor.exit_code(checks)
 
 
-def _workflows(args: argparse.Namespace, ws: workspace.Workspace | None) -> int:
-    if args.wf_cmd == "copy":
-        if ws is None:
-            raise FactoryError("no workspace here. Run `minifactory init` first")
-        for path in templates.copy(args.name, ws.root, ws.config.workflows_dir):
-            print(f"  + {path.relative_to(ws.root)}")
-        return 0
-    if args.wf_cmd == "enable":
-        return _enable(args, ws)
-    print("your workflows:")
-    mine = [f for folder in args.workflow_dirs for f in sorted(folder.glob("*.yaml"))]
-    for f in mine:
-        try:
-            spec = load_workflow(f)
-            print(f"  {spec.name:<32} {'routable' if spec.route else 'run only'}   {f}")
-        except FactoryError as e:
-            print(f"  {f.stem:<32} INVALID: {str(e)[:80]}")
-    if not mine:
-        print("  (none)")
-    drafts = [f for folder in args.workflow_dirs for f in sorted((folder / "drafts").glob("*.yaml"))]
-    if drafts:
-        print("\ndrafts (not routable until `minifactory workflows enable NAME`):")
-        for f in drafts:
-            print(f"  {f.stem:<32} {f}")
-    print("\ntemplates (copy with `minifactory workflows copy NAME`):")
-    for t in templates.available().values():
-        print(f"  {t.name:<32} {t.description}")
-    return 0
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = _parser()
     completion.activate_if_requested(parser)  # only does anything when the shell is asking for completions
     args = parser.parse_args(argv)
     try:
         if args.cmd == "completion":
-            print(completion.shell_script(args.shell))
-            return 0
+            return run_completion(args)
 
         if args.cmd == "init":
             folder = Path(args.folder)
@@ -351,12 +160,13 @@ def main(argv: list[str] | None = None) -> int:
                 root = folder.resolve()
                 created += [str(p.relative_to(root)) for p in templates.copy(args.template, root)]
             print(f"workspace ready in {folder.resolve()}" + "".join(f"\n  + {c}" for c in created))
+            completion_tip()
             return 0
 
         ws = _use_workspace(args)
         registry.load_plugins(args.plugin)
         if args.cmd == "workflows":
-            return _workflows(args, ws)
+            return run_workflows(args, ws)
         if args.cmd == "doctor":
             return _doctor(args, ws)
 
@@ -395,9 +205,9 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.cmd == "ask":
-            return _ask(args)
+            return run_ask(args)
 
-        spec = load_workflow(_resolve_workflow(args.workflow, args.workflow_dirs))
+        spec = load_workflow(resolve_workflow(args.workflow, args.workflow_dirs))
         if args.cmd == "validate":
             print(f"workflow '{spec.name}' is valid ({len(spec.steps)} steps)")
             return 0
@@ -409,7 +219,7 @@ def main(argv: list[str] | None = None) -> int:
             jobs = [j for j in jobs if j.id in args.only]
         if args.limit:
             jobs = jobs[: args.limit]
-        _execute(engine, bus, jobs, args)
+        execute(engine, bus, jobs, args)
         return 0
     except FactoryError as e:
         print(f"error: {e}", file=sys.stderr)

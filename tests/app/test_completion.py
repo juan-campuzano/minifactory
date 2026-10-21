@@ -87,7 +87,9 @@ def test_templates_and_drafts_have_their_own_completion(ws, monkeypatch):
 def test_choices_and_plugin_names(ws, monkeypatch):
     assert set(complete("minifactory ask --router ", monkeypatch)) >= {"jev", "keyword"}
     assert set(complete("minifactory ask --output ", monkeypatch)) == {"local", "github"}
-    assert set(complete("minifactory completion ", monkeypatch)) == {"bash", "zsh", "fish"}
+    assert set(complete("minifactory completion ", monkeypatch)) == {"show", "install", "uninstall", "status"}
+    assert set(complete("minifactory completion show ", monkeypatch)) == {"bash", "zsh", "fish"}
+    assert set(complete("minifactory completion install --shell ", monkeypatch)) == {"bash", "zsh", "fish"}
 
 
 def test_without_a_workspace_it_still_works(tmp_path, monkeypatch):
@@ -107,14 +109,14 @@ def test_a_broken_config_never_reaches_the_terminal(tmp_path, monkeypatch):
 # -- the scripts ---------------------------------------------------------------------------------
 def test_completion_prints_a_script_for_each_shell(capsys):
     for shell, marker in (("bash", "complete"), ("zsh", "compdef"), ("fish", "complete --command minifactory")):
-        assert main(["completion", shell]) == 0
+        assert main(["completion", "show", shell]) == 0
         script = capsys.readouterr().out
         assert "minifactory" in script and marker in script, shell
 
 
 def test_an_unsupported_shell_is_rejected_by_the_parser(capsys):
     with pytest.raises(SystemExit):
-        main(["completion", "tcsh"])
+        main(["completion", "show", "tcsh"])
     assert "invalid choice" in capsys.readouterr().err
 
 

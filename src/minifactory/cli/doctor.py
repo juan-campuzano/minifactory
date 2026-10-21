@@ -16,6 +16,7 @@ from typing import Any, Literal
 
 import minifactory
 from minifactory import stacks, workspace
+from minifactory.core.errors import FactoryError
 from minifactory.core.workflow import WorkflowSpec
 
 Status = Literal["ok", "warn", "fail", "info"]
@@ -71,6 +72,16 @@ class System:
         creds = session.get_credentials()
         return (getattr(creds, "method", "found") if creds else None), session.region_name
 
+    def completion(self) -> tuple[str | None, str | None]:
+        """(your shell, 'installed' | 'stale' | 'missing'); (None, None) when the shell is not one we support."""
+        from . import shell_setup
+
+        try:
+            shell = shell_setup.detect_shell()
+            return shell, shell_setup.status(shell)
+        except FactoryError:
+            return None, None
+
     def aws_identity(self) -> str:  # --online only
         import boto3
 
@@ -125,6 +136,17 @@ def core_checks(ws: workspace.Workspace | None) -> list[Check]:
     out.append(Check("minifactory", "workflows folder", "ok" if folder.is_dir() else "warn", str(folder),
                      "" if folder.is_dir() else "create it, or `minifactory workflows copy NAME`"))
     return out
+
+
+def completion_check(system: System) -> list[Check]:
+    shell, state = system.completion()
+    if shell is None:
+        return []
+    detail, status = {"installed": (f"installed for {shell}", "ok"),
+                      "stale": (f"installed for {shell}, but out of date", "warn"),
+                      "missing": (f"not installed for {shell}", "info")}[str(state)]
+    return [Check("minifactory", "tab completion", status, detail,
+                  "" if state == "installed" else "run `minifactory completion install`")]
 
 
 def toolchain_checks(system: System, root: Path | None) -> list[Check]:
@@ -251,7 +273,8 @@ def run_checks(system: System, ws: workspace.Workspace | None, *, workflow: Work
     if workflow is not None:
         return checks + workflow_checks(system, workflow, online)
     root = ws.root if ws else None
-    return checks + toolchain_checks(system, root) + service_checks(system, online) + agent_tool_checks(system)
+    return (checks + completion_check(system) + toolchain_checks(system, root)
+            + service_checks(system, online) + agent_tool_checks(system))
 
 
 def exit_code(checks: list[Check]) -> int:
