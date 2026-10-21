@@ -1,4 +1,4 @@
-# Publishes to PyPI when you push a tag like v0.0.2a1 (it must match the version in pyproject.toml exactly). Uses PyPI "Trusted Publishing" (OIDC): no token is stored anywhere.
+# Publishes to PyPI when you push a tag like v0.0.2a2 (it must match the version in pyproject.toml exactly). Uses PyPI "Trusted Publishing" (OIDC): no token is stored anywhere.
 # PyPI setup: owner juan-campuzano, repository minifactory, workflow publish.yml, environment pypi.
 name: publish
 on:
