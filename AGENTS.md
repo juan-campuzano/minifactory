@@ -143,6 +143,14 @@ workflow resolve from the workspace root**; a file path given on the command lin
 `schema_version` (only 1 exists). `minifactory workflows copy` skips identical existing files and refuses to overwrite ones you edited.
 `run_shell` adds `src/` to `PYTHONPATH` only for a source checkout.
 
+## Shell completion
+`minifactory completion {bash,zsh,fish}` prints the argcomplete script; Tab runs the program itself with `_ARGCOMPLETE` set. `cli/completion.py` holds the
+completers (workflow names from the workspace, templates, drafts, routers; a path only once you start typing one) and `attach()` hooks them onto the parser
+(`names` dict in `_parser()`). Rules: a completer never raises or prints (`_safely`), never `chdir`s (it uses `workspace.find()`), and argcomplete is not
+imported unless `_ARGCOMPLETE` is set (a test checks it: a normal run must stay at ~90 ms). Flags are offered only after a dash (`always_complete_options=False`).
+In tests argcomplete's debug stream must be swapped for stderr: by default it opens fd 9, which is pytest's faulthandler fd, and closing it breaks the session.
+Verified: the real protocol in a workspace, the script loading in zsh 5 (registers `_python_argcomplete`) and bash 3.2 (needs `eval`, not `source <()`). Not verified: fish.
+
 ## Runner (how commands run)
 Port `Runner.run(cmd, cwd, timeout) -> (rc, output)` (core/ports.py); a workflow picks one with `runner: {use: host}` (default). Steps NEVER spawn
 processes: they call `run_cmd(ctx, cmd, timeout)` (support/shell.py), which uses `ctx.runner` (a test enforces it: no `subprocess` in `steps/`).

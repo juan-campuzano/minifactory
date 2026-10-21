@@ -12,13 +12,17 @@ from minifactory.core.errors import FactoryError, RoutingError, VagueRequest
 from minifactory.core.events import ConsoleSink, EventBus
 from minifactory.core.workflow import load_workflow
 
+from . import completion
+
 
 def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="minifactory", description="Tiny pluggable software factory")
     sub = p.add_subparsers(dest="cmd", required=True)
+    names: dict[str, argparse.Action] = {}  # arguments whose value can be completed (see cli/completion.py)
 
     run = sub.add_parser("run", help="run a workflow over all jobs from its source")
-    run.add_argument("workflow", help="a workflow name (from your workspace) or a path to a .yaml")
+    names["run.workflow"] = run.add_argument(
+        "workflow", help="a workflow name (from your workspace) or a path to a .yaml")
     run.add_argument("--runs-dir", help="default: from minifactory.yaml")
     run.add_argument("--resume", action="store_true", help="skip steps already completed (ok)")
     run.add_argument("--only", action="append", default=[], help="job id to run (repeatable)")
@@ -30,7 +34,7 @@ def _parser() -> argparse.ArgumentParser:
     ask = sub.add_parser("ask", help="describe what you need in plain language; picks and runs a workflow")
     ask.add_argument("request")
     ask.add_argument("--workflows-dir", help="default: the workspace workflows folders")
-    ask.add_argument("--router", help="router plugin (default: minifactory.yaml, then jev)")
+    names["ask.router"] = ask.add_argument("--router", help="router plugin (default: minifactory.yaml, then jev)")
     ask.add_argument("--threshold", type=float, help="minimum router confidence (default: minifactory.yaml, then 0.7)")
     ask.add_argument("--yes", action="store_true", help="don't ask; only acts when confident and actionable")
     ask.add_argument("--dry-run", action="store_true", help="show the chosen workflow and drafted input, run nothing")
@@ -44,7 +48,7 @@ def _parser() -> argparse.ArgumentParser:
     ask.add_argument("--plugin", action="append", default=[])
 
     val = sub.add_parser("validate", help="check a workflow without running it")
-    val.add_argument("workflow", help="a workflow name or a path to a .yaml")
+    names["validate.workflow"] = val.add_argument("workflow", help="a workflow name or a path to a .yaml")
     val.add_argument("--plugin", action="append", default=[])
 
     pl = sub.add_parser("plugins", help="list registered plugins")
@@ -55,25 +59,31 @@ def _parser() -> argparse.ArgumentParser:
 
     init = sub.add_parser("init", help="create a workspace (minifactory.yaml + workflows/) in a folder")
     init.add_argument("folder", nargs="?", default=".")
-    init.add_argument("--template", help="also copy a template workflow (see `minifactory workflows list`)")
+    names["init.template"] = init.add_argument(
+        "--template", help="also copy a template workflow (see `minifactory workflows list`)")
 
     wf = sub.add_parser("workflows", help="list or copy workflows")
     wf_sub = wf.add_subparsers(dest="wf_cmd", required=True)
     wf_sub.add_parser("list", help="your workflows and the templates that ship with the package")
     cp = wf_sub.add_parser("copy", help="copy a packaged template into your workspace")
-    cp.add_argument("name")
+    names["workflows.copy.name"] = cp.add_argument("name")
     en = wf_sub.add_parser("enable", help="review a drafted workflow and make it active (routable by `ask`)")
-    en.add_argument("name")
+    names["workflows.enable.name"] = en.add_argument("name")
     en.add_argument("--yes", action="store_true", help="don't ask for confirmation")
 
     doc = sub.add_parser("doctor", help="check what is installed and configured; optionally what a workflow needs")
-    doc.add_argument("workflow", nargs="?", help="a workflow name or path: check what IT needs")
+    names["doctor.workflow"] = doc.add_argument(
+        "workflow", nargs="?", help="a workflow name or path: check what IT needs")
     doc.add_argument("--online", action="store_true", help="also contact AWS and GitHub (no secrets are printed)")
     doc.add_argument("--json", action="store_true", help="machine-readable output")
     doc.add_argument("--plugin", action="append", default=[])
 
+    comp = sub.add_parser("completion", help="print the tab-completion script for your shell (bash, zsh or fish)")
+    comp.add_argument("shell", choices=completion.SHELLS)
+
     demo = sub.add_parser("demo-init", help="create the demo sandbox (git remotes + catalog)")
     demo.add_argument("--dir", default="demo")
+    completion.attach(names)
     return p
 
 
@@ -326,8 +336,14 @@ def _workflows(args: argparse.Namespace, ws: workspace.Workspace | None) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = _parser().parse_args(argv)
+    parser = _parser()
+    completion.activate_if_requested(parser)  # only does anything when the shell is asking for completions
+    args = parser.parse_args(argv)
     try:
+        if args.cmd == "completion":
+            print(completion.shell_script(args.shell))
+            return 0
+
         if args.cmd == "init":
             folder = Path(args.folder)
             created = workspace.init(folder)
