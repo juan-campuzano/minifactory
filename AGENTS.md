@@ -17,6 +17,7 @@ pytest                                              # no network, no Flutter SDK
 ruff check src tests examples
 mypy                                                # strict; see "Known gaps"
 minifactory plugins                                     # list registered plugins
+minifactory doctor [WORKFLOW] [--online] [--json]       # what is installed/configured; what a workflow needs (exit 1 if it lacks something)
 minifactory init my-factory && cd my-factory           # create a workspace
 minifactory workflows list | copy NAME                  # packaged templates -> your workspace
 minifactory validate flutter-app-factory                # by name (or path); fail-fast checks, runs nothing
@@ -118,6 +119,14 @@ Precedence: CLI flag > minifactory.yaml > default. When a workspace is found the
 workflow resolve from the workspace root**; a file path given on the command line is made absolute first. Workflows also carry
 `schema_version` (only 1 exists). `minifactory workflows copy` skips identical existing files and refuses to overwrite ones you edited.
 `run_shell` adds `src/` to `PYTHONPATH` only for a source checkout.
+
+## Doctor (`minifactory doctor`)
+`src/minifactory/doctor.py`: every machine fact goes through `System` (which/run/getenv/has_module/aws), so tests use a fake one. Without a workflow:
+core, one line per stack profile (a missing toolchain is `info`, not a failure), bedrock/AWS (credentials found + region, never the credentials),
+`TYPESAFE_API_KEY` set or not, git/gh, and informational agent CLIs (claude, copilot, gemini, codex) and isolation tools (srt, bwrap, sandbox-exec,
+docker, podman) marked "not used yet". With a workflow: its needs are derived from its providers and steps (bedrock -> boto3 + credentials, github -> gh,
+non-fake `flutter.*` -> flutter, a stack named in the workflow -> that toolchain), and a missing one FAILS (exit 1). `--online` adds `gh auth status` and
+the AWS identity (account id masked). Rule: never print a secret, never touch the network without `--online`.
 
 ## Naming
 Package, import name and command are all `minifactory` (the bare name `factory` is factory_boy's import name: never reuse it). Workspace file

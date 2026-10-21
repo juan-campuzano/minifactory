@@ -30,6 +30,7 @@ class StackProfile(BaseModel):
     name: str = Field(pattern=r"^[a-z][a-z0-9-]{0,30}$")
     description: str
     requires: list[str] = Field(default_factory=list)  # executables that must be on PATH
+    tools: list[str] = Field(default_factory=list)  # more executables real work needs (shown by `doctor`, not enforced)
     detect: list[str] = Field(default_factory=list)  # files whose presence identifies an existing repo
     manifest: str = ""  # the dependency/project file (shown to the LLM, reviewed for new dependencies)
     seed_files: dict[str, str] = Field(default_factory=dict)  # path -> content, written by scaffold

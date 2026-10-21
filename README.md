@@ -67,6 +67,18 @@ pip install -e ".[dev,aws]"
 
 Python 3.11+. Workflows live in a **workspace**, not in the package (see below).
 
+## Check your setup: `minifactory doctor`
+
+```bash
+minifactory doctor                  # what is installed and configured: toolchains per stack, AWS, gh, router key
+minifactory doctor fix-bug          # what THIS workflow needs: a missing requirement fails (exit code 1)
+minifactory doctor --online         # also contacts AWS and GitHub to check the logins work
+minifactory doctor --json           # for scripts and CI
+```
+
+A missing toolchain is only information until a workflow needs it. Secrets are reported as "set", never printed, and
+nothing leaves your machine unless you pass `--online`.
+
 ## Quick start (offline, no keys, no SDK)
 
 ```bash

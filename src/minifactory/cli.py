@@ -66,6 +66,12 @@ def _parser() -> argparse.ArgumentParser:
     en.add_argument("name")
     en.add_argument("--yes", action="store_true", help="don't ask for confirmation")
 
+    doc = sub.add_parser("doctor", help="check what is installed and configured; optionally what a workflow needs")
+    doc.add_argument("workflow", nargs="?", help="a workflow name or path: check what IT needs")
+    doc.add_argument("--online", action="store_true", help="also contact AWS and GitHub (no secrets are printed)")
+    doc.add_argument("--json", action="store_true", help="machine-readable output")
+    doc.add_argument("--plugin", action="append", default=[])
+
     demo = sub.add_parser("demo-init", help="create the demo sandbox (git remotes + catalog)")
     demo.add_argument("--dir", default="demo")
     return p
@@ -273,6 +279,22 @@ def _enable(args: argparse.Namespace, ws: workspace.Workspace | None) -> int:
     return 0
 
 
+def _doctor(args: argparse.Namespace, ws: workspace.Workspace | None) -> int:
+    from minifactory import doctor
+
+    spec = load_workflow(_resolve_workflow(args.workflow, args.workflow_dirs)) if args.workflow else None
+    checks = doctor.run_checks(doctor.System(), ws, workflow=spec, online=args.online)
+    if args.json:
+        import json
+
+        print(json.dumps(doctor.as_json(checks), indent=2))
+    else:
+        from rich.console import Console
+
+        doctor.render(checks, Console())
+    return doctor.exit_code(checks)
+
+
 def _workflows(args: argparse.Namespace, ws: workspace.Workspace | None) -> int:
     if args.wf_cmd == "copy":
         if ws is None:
@@ -319,6 +341,8 @@ def main(argv: list[str] | None = None) -> int:
         registry.load_plugins(args.plugin)
         if args.cmd == "workflows":
             return _workflows(args, ws)
+        if args.cmd == "doctor":
+            return _doctor(args, ws)
 
         if args.cmd == "demo-init":
             from minifactory.demo import demo_init

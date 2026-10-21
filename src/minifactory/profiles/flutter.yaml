@@ -1,6 +1,7 @@
 name: flutter
 description: "Flutter/Dart mobile apps (needs the Flutter SDK). Sources in lib/, widget tests in test/."
 requires: []
+tools: [flutter]   # not enforced: FACTORY_FLUTTER=fake simulates it for demos
 detect: [pubspec.yaml]
 manifest: pubspec.yaml
 scaffold:
