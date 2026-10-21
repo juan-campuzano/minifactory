@@ -204,3 +204,17 @@ def test_a_refusal_is_reported_by_its_conclusion_not_its_preamble():
     long = "I need to analyze this. " * 40 + "In conclusion no step can post to Slack."
     assert _what_it_said("some analysis\nMISSING: a Slack step\nmore") == "MISSING: a Slack step"
     assert _what_it_said(long).endswith("no step can post to Slack.") and len(_what_it_said(long)) < 320
+
+
+def test_the_catalog_lists_the_installed_stacks_so_the_agent_does_not_ask_for_one_per_language():
+    md = catalog.render_markdown()
+    assert "# Stacks installed" in md and "No new step is needed per language" in md
+    assert all(f"- {name}:" in md for name in ("python", "node", "java", "flutter"))
+
+
+def test_the_catalog_step_reports_which_version_it_saw(ws):
+    import minifactory
+
+    result = run_creator(ws)
+    message = next(s.message for s in result.steps if s.id == "catalog")
+    assert f"minifactory {minifactory.__version__}" in message and "steps" in message and "stacks" in message

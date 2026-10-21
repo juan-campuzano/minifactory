@@ -7,7 +7,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from minifactory import catalog, templates
+import minifactory
+from minifactory import catalog, stacks, templates
 from minifactory.core.context import Step, StepContext, StrictParams
 from minifactory.core.errors import FactoryError
 from minifactory.core.models import Artifact, StepResult
@@ -53,7 +54,9 @@ class WriteCatalog(Step):
             return StepResult.failed(f"unknown example template '{p.example}'")
         (ctx.repo_dir / "CATALOG.md").write_text(catalog.render_markdown())
         (ctx.repo_dir / "EXAMPLE.yaml").write_text((available[p.example].path / "workflow.yaml").read_text())
-        return StepResult.ok("CATALOG.md and EXAMPLE.yaml written")
+        described = catalog.describe()
+        return StepResult.ok(f"CATALOG.md written for minifactory {minifactory.__version__}: "
+                             f"{len(described['steps'])} steps, {len(stacks.available())} stacks")
 
 
 class SaveParams(StrictParams):

@@ -7,6 +7,7 @@ from __future__ import annotations
 import inspect
 from typing import Any
 
+from . import stacks
 from .core import registry
 
 # Constructor arguments that are injected by the engine or exist only for tests: not for a workflow author.
@@ -120,6 +121,14 @@ def render_markdown() -> str:
         needs = f" [needs providers: {', '.join(info['needs'])}]" if info["needs"] else ""
         lines += [f"## {name}{needs}", info["doc"] or "(no description)",
                   f"params: {_params_line(info['params'], True)}", ""]
+    profiles = stacks.available()
+    lines += [
+        "# Stacks installed (languages the `stack.*` steps and `agent.*` steps can work in)", "",
+        "`stack.scaffold` creates a project, `stack.check` analyzes/tests it and `stack.detect` recognises an",
+        "existing repository, for any of these. Use `${job.stack}` or a `stack:` parameter.",
+        "No new step is needed per language.", "",
+    ]
+    lines += [f"- {name}: {p.description}" for name, p in profiles.items()] + [""]
     lines += ["# Plugins for `source`, `executor` and `providers` (`use:` + `with:` = constructor arguments)", ""]
     for kind in ("source", "executor", "scm", "llm", "secrets"):
         for name, info in d[kind].items():
