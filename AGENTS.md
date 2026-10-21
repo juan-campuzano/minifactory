@@ -83,6 +83,13 @@ GitHub/LLM spend, missing `route:`). Drafts are NOT discovered by `ask` (`discov
 re-validates, prints the review, asks (or `--yes`) and moves the file. If the goal needs a nonexistent step the agent must reply `MISSING: ...`
 (reported by `agent.edit` as its failure reason). Only existing steps are composed: the agent never writes Python plugins.
 Verified 2026-10-20 with Haiku 4.5: a feasible goal gave a valid 4-step draft in 1 call (~$0.006); a Slack goal ended in `MISSING: slack.post`.
+Lessons (2026-10-21, a false `MISSING: agent.scaffold_python_cli` for "crea un workflow para crear cli's en python" on 0.0.2a1, reproduced):
+the agent only saw a bug-fixing example, so it did not realise that creating a program from a description is `stack.scaffold` + `agent.plan_app` +
+`agent.implement_spec`. Fixes: `workflow.catalog` writes one example per KIND (`EXAMPLE_app-factory.yaml`, `EXAMPLE_fix-bug.yaml`), the catalog lists the
+installed stacks, and the instruction says steps COMBINE. Over-correcting made it write a Slack workflow whose "announce" step was `echo ...` (a lie, worse
+than MISSING), so: the instruction forbids faking, and `review.py` flags any `shell.run` that only prints text. Checked with Haiku 4.5, two rounds each:
+python CLI goal (Spanish and English) -> draft; `dart format` + PR -> draft; Slack and SMS -> MISSING. The instruction text lives in the workspace COPY of the
+template, so an old copy keeps the old behaviour until it is recopied.
 Not done: a dry-run of the draft with fake providers (it is validated, reviewed and not executed); judging whether a *valid* draft is *sensible*
 is the reviewer's job (e.g. the dart-format draft picked the `repo-task` intake, which expects a bug description).
 

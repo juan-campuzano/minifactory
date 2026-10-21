@@ -13,6 +13,7 @@ route:
   examples:
     - a workflow that runs the tests of a repository and opens a pull request when they pass
     - create a workflow that formats the code with a shell command and delivers the result as a PR
+    - crea un workflow para crear herramientas de linea de comandos en python
   needs: a description of what the new workflow should do, step by step (at least a sentence)
   intake: workflow-goal
   delivery: fixed
@@ -43,12 +44,21 @@ steps:
     with:
       instruction: >-
         Write the file draft.yaml: a minifactory workflow for the goal below. Read CATALOG.md (the format
-        rules and the ONLY steps, providers and parameters that exist) and EXAMPLE.yaml (a working workflow).
-        Use only what CATALOG.md lists; do not invent steps or parameters. Include a `route:` block so
-        `minifactory ask` can find it, and keep the workflow small. If the goal cannot be done with the listed
-        steps, do NOT write the file: your ENTIRE reply must be one line, `MISSING: <the step or provider that would be needed>`, with no analysis.
+        rules and the ONLY steps, providers, stacks and parameters that exist) and the EXAMPLE_*.yaml files
+        (working workflows to imitate: app-factory CREATES a new project from a description in any stack, fix-bug
+        FIXES a bug in an existing repository). Use only what CATALOG.md lists; do not invent steps or parameters.
+        Steps COMBINE: "generate a program from a description" is not a missing step, it is agent.plan_app +
+        agent.implement_spec after stack.scaffold, with stack.check as the gates (see EXAMPLE_app-factory.yaml);
+        supporting a language is a stack profile, never a step. Everything the listed steps and providers can
+        really do is available: real commands through shell.run (a formatter, a compiler, a test runner, git),
+        the github provider with scm.clone and scm.open_pr, the llm providers. Answer MISSING only when the goal
+        needs a capability that NONE of that provides (posting to a chat, sending an SMS). Never fake one: a
+        command that only prints text (echo, printf, true) standing in for an action the goal asks for is a lie.
+        Include a `route:` block so `minifactory ask` can find the
+        workflow, and keep it small. If you must answer MISSING, do NOT write the file: your ENTIRE reply must be
+        one line, `MISSING: <the step or provider that would be needed>`, with no analysis.
         GOAL: ${job.goal}
-      files: ["CATALOG.md", "EXAMPLE.yaml"]
+      files: ["CATALOG.md", "EXAMPLE_app-factory.yaml", "EXAMPLE_fix-bug.yaml"]
       allowed_prefixes: ["draft.yaml"]
       commit_message: "draft the workflow"
 

@@ -39,7 +39,10 @@ class WorkflowLLM:
     draft, repair = file_block(GOOD), file_block(GOOD)
     calls: list[str] = []
 
+    prompts: list[str] = []
+
     def complete(self, system, prompt):
+        WorkflowLLM.prompts.append(prompt)
         WorkflowLLM.calls.append("repair" if "TASK: repair" in prompt else "draft")
         return WorkflowLLM.repair if "TASK: repair" in prompt else WorkflowLLM.draft
 
@@ -55,7 +58,7 @@ def ws(tmp_path, monkeypatch):
     templates.copy("create-workflow", root)
     monkeypatch.chdir(root)
     WorkflowLLM.draft = WorkflowLLM.repair = file_block(GOOD)
-    WorkflowLLM.calls = []
+    WorkflowLLM.calls, WorkflowLLM.prompts = [], []
     return root
 
 
@@ -212,9 +215,36 @@ def test_the_catalog_lists_the_installed_stacks_so_the_agent_does_not_ask_for_on
     assert all(f"- {name}:" in md for name in ("python", "node", "java", "flutter"))
 
 
+def test_the_agent_gets_an_example_of_each_kind_of_workflow(ws):
+    result = run_creator(ws)
+    work = ws / ".minifactory" / "runs" / "create-workflow" / result.job_id / "work" / "repo"
+    assert (work / "EXAMPLE_app-factory.yaml").is_file() and (work / "EXAMPLE_fix-bug.yaml").is_file()
+    assert (work / "EXAMPLE.yaml").read_text() == (work / "EXAMPLE_app-factory.yaml").read_text()
+    assert "stack.scaffold" in (work / "EXAMPLE_app-factory.yaml").read_text()
+
+
+def test_the_draft_instruction_says_steps_combine_and_missing_is_a_last_resort(ws):
+    run_creator(ws)
+    assert any("Steps COMBINE" in p and "agent.plan_app" in p and "never a step" in p for p in WorkflowLLM.prompts)
+
+
 def test_the_catalog_step_reports_which_version_it_saw(ws):
     import minifactory
 
     result = run_creator(ws)
     message = next(s.message for s in result.steps if s.id == "catalog")
     assert f"minifactory {minifactory.__version__}" in message and "steps" in message and "stacks" in message
+
+
+def test_review_flags_a_step_that_only_prints_text_as_a_probable_placeholder():
+    spec = WorkflowSpec.model_validate({
+        "name": "t", "source": {"use": "static", "with": {"jobs": []}},
+        "steps": [{"id": "announce", "use": "shell.run", "with": {"cmd": "echo 'posted to Slack'"}},
+                  {"id": "real", "use": "shell.run", "with": {"cmd": "make test"}}]})
+    text = "\n".join(str(f) for f in review(spec))
+    assert "step 'announce' only prints text" in text and "step 'real' only prints text" not in text
+
+
+def test_the_draft_instruction_forbids_faking_a_capability(ws):
+    run_creator(ws)
+    assert any("Never fake one" in p and "echo, printf, true" in p for p in WorkflowLLM.prompts)

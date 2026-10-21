@@ -20,6 +20,9 @@ _PROVIDERS = {
 }
 
 
+_PLACEHOLDER_COMMANDS = {"echo", "printf", "true", ":", "sleep"}
+
+
 @dataclass(frozen=True)
 class Finding:
     warn: bool
@@ -33,7 +36,11 @@ def review(spec: WorkflowSpec) -> list[Finding]:
     out: list[Finding] = []
     for step in spec.steps:
         if step.use == "shell.run":
-            out.append(Finding(True, f"step '{step.id}' runs a shell command: {step.with_.get('cmd')!r}"))
+            cmd = str(step.with_.get("cmd", ""))
+            out.append(Finding(True, f"step '{step.id}' runs a shell command: {cmd!r}"))
+            if cmd.split()[:1] and cmd.split()[0] in _PLACEHOLDER_COMMANDS:
+                out.append(Finding(True, f"step '{step.id}' only prints text: probably a placeholder standing in "
+                                         "for a real action it does not perform"))
         elif step.use in _EFFECTS:
             out.append(Finding(True, f"step '{step.id}' {_EFFECTS[step.use]}"))
         elif step.use.startswith("agent."):

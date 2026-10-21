@@ -38,25 +38,32 @@ class WorkdirInit(Step):
 
 
 class CatalogParams(StrictParams):
-    example: str = "fix-bug"  # a packaged template shown as a working example (EXAMPLE.yaml)
+    # packaged templates shown as working examples: EXAMPLE_<name>.yaml (the first is also EXAMPLE.yaml).
+    # One of each KIND of workflow: an agent that only sees a bug-fixing example does not realise that
+    # creating a program from a description is also something the listed steps can do.
+    examples: list[str] = ["app-factory", "fix-bug"]
 
 
 @register("step", "workflow.catalog")
 class WriteCatalog(Step):
-    """Write CATALOG.md (the format rules and every step and plugin installed, with parameters) and
-    EXAMPLE.yaml (a working workflow) into the work directory, for an agent to read."""
+    """Write CATALOG.md (the format rules and every step, plugin and stack installed, with parameters)
+    and EXAMPLE_<name>.yaml (working workflows) into the work directory, for an agent to read."""
 
     Params = CatalogParams
 
     def run(self, ctx: StepContext, p: CatalogParams) -> StepResult:
         available = templates.available()
-        if p.example not in available:
-            return StepResult.failed(f"unknown example template '{p.example}'")
+        if unknown := [name for name in p.examples if name not in available]:
+            return StepResult.failed(f"unknown example template(s): {', '.join(unknown)}")
         (ctx.repo_dir / "CATALOG.md").write_text(catalog.render_markdown())
-        (ctx.repo_dir / "EXAMPLE.yaml").write_text((available[p.example].path / "workflow.yaml").read_text())
+        for name in p.examples:
+            (ctx.repo_dir / f"EXAMPLE_{name}.yaml").write_text((available[name].path / "workflow.yaml").read_text())
+        if p.examples:  # the old single-file name, for workflows written against it
+            (ctx.repo_dir / "EXAMPLE.yaml").write_text((ctx.repo_dir / f"EXAMPLE_{p.examples[0]}.yaml").read_text())
         described = catalog.describe()
         return StepResult.ok(f"CATALOG.md written for minifactory {minifactory.__version__}: "
-                             f"{len(described['steps'])} steps, {len(stacks.available())} stacks")
+                             f"{len(described['steps'])} steps, {len(stacks.available())} stacks",
+                             examples=[f"EXAMPLE_{n}.yaml" for n in p.examples])
 
 
 class SaveParams(StrictParams):
