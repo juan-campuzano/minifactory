@@ -61,7 +61,7 @@ steps:
     use: agent.repair_build
     when: "steps.analyze.status == 'failed' or steps.test.status == 'failed'"
     with:
-      verify_cmd: "${env.python} -m minifactory.plugins.builtin.flutter_tool --tool fake analyze && ${env.python} -m minifactory.plugins.builtin.flutter_tool --tool fake test"
+      verify_cmd: "${env.python} -m minifactory.plugins.builtin.tools.flutter_tool --tool fake analyze && ${env.python} -m minifactory.plugins.builtin.tools.flutter_tool --tool fake test"
       globs: ["lib/**/*.dart", "test/**/*.dart"]
       max_attempts: 4
       max_unproductive: 2

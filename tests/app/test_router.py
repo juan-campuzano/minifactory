@@ -6,15 +6,15 @@ import urllib.error
 
 import pytest
 
-from minifactory import router as R
+from minifactory import ask as R
 from minifactory.cli import main
 from minifactory.core import registry
 from minifactory.core.context import Step, StrictParams
 from minifactory.core.errors import RoutingError
 from minifactory.core.models import Candidate, Decision, StepResult
 from minifactory.core.workflow import WorkflowSpec, validate_spec
-from minifactory.plugins.builtin.intakes import AppSpecIntake
-from minifactory.plugins.builtin.routers import JevRouter, KeywordRouter
+from minifactory.plugins.builtin.routing.intakes import AppSpecIntake
+from minifactory.plugins.builtin.routing.routers import JevRouter, KeywordRouter
 
 registry.load_plugins()
 RAN: list[str] = []
@@ -238,7 +238,7 @@ def test_ask_yes_refuses_when_nothing_fits(wf_dir, capsys):
 def test_http_providers_use_a_tls_context_with_root_certificates():
     import ssl
 
-    from minifactory.plugins.builtin.util import ssl_context
+    from minifactory.plugins.builtin.support.tls import ssl_context
 
     ctx = ssl_context()
     assert isinstance(ctx, ssl.SSLContext) and ctx.cert_store_stats()["x509_ca"] > 0

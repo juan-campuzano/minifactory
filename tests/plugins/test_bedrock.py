@@ -1,7 +1,7 @@
 import pytest
 
 from minifactory.core import registry
-from minifactory.plugins.builtin.providers_bedrock import BedrockLLM
+from minifactory.plugins.builtin.providers.bedrock import BedrockLLM
 
 registry.load_plugins()
 

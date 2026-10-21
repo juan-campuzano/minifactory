@@ -8,7 +8,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from minifactory.plugins.builtin.util import git
+from minifactory.plugins.builtin.support.git import git
 
 CHECK_PY = '''\
 import sys

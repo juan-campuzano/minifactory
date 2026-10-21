@@ -12,8 +12,8 @@ from minifactory.core import registry
 from minifactory.core.engine import Engine
 from minifactory.core.models import Job
 from minifactory.core.workflow import WorkflowSpec, validate_spec
-from minifactory.plugins.builtin.intakes import AppSpecIntake
-from minifactory.plugins.builtin.util import collect_files, glob_match
+from minifactory.plugins.builtin.routing.intakes import AppSpecIntake
+from minifactory.plugins.builtin.support.edits import collect_files, glob_match
 
 registry.load_plugins()
 
@@ -200,7 +200,7 @@ def test_an_unsupported_or_missing_stack_is_refused_with_the_alternatives(stack)
 # -- the planner follows the stack, not a hardcoded language ----------------------------------------
 def planned(stack, factory_ws=None):
     from minifactory.core.context import StepContext
-    from minifactory.plugins.builtin.steps_agent import PlanApp
+    from minifactory.plugins.builtin.steps.agent import PlanApp
 
     llm = StackLLM()
     attrs = {"description": "d", "size": "minimal", **({"stack": stack} if stack else {})}
@@ -281,7 +281,7 @@ registry.register("llm", "t.pybug")(type("PyBugLLM", (BugLLM,), {"__init__": lam
 
 
 def make_python_remote(tmp_path):
-    from minifactory.plugins.builtin.util import git
+    from minifactory.plugins.builtin.support.git import git
 
     seed = tmp_path / "seed"
     (seed / "src").mkdir(parents=True)
@@ -301,8 +301,8 @@ def make_python_remote(tmp_path):
 
 @pytest.mark.skipif(not has("python"), reason="python3 not installed")
 def test_fix_bug_detects_the_stack_reproduces_the_bug_and_fixes_it(tmp_path, monkeypatch):
-    from minifactory.plugins.builtin.intakes import repo_task_job
-    from minifactory.plugins.builtin.util import git
+    from minifactory.plugins.builtin.routing.intakes import repo_task_job
+    from minifactory.plugins.builtin.support.git import git
 
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
     root = tmp_path / "ws"
@@ -331,7 +331,7 @@ def test_fix_bug_detects_the_stack_reproduces_the_bug_and_fixes_it(tmp_path, mon
 
 def test_an_unrecognised_repository_stops_before_anything_is_spent(tmp_path, monkeypatch):
     from minifactory.core.context import StepContext
-    from minifactory.plugins.builtin.steps_stack import Detect
+    from minifactory.plugins.builtin.steps.stack import Detect
 
     ctx = StepContext(job=Job(id="j", name="j"), work_dir=tmp_path, scm=None, llm=None, secrets=None,
                       emit=lambda *a, **k: None)
@@ -346,7 +346,7 @@ def test_an_unrecognised_repository_stops_before_anything_is_spent(tmp_path, mon
 @pytest.mark.skipif(not has("python"), reason="python3 not installed")
 def test_the_python_analyze_check_finds_syntax_errors_and_leaves_no_bytecode(tmp_path):
     from minifactory.core.context import StepContext
-    from minifactory.plugins.builtin.steps_stack import Check
+    from minifactory.plugins.builtin.steps.stack import Check
 
     ctx = StepContext(job=Job(id="j", name="j", attrs={"stack": "python"}), work_dir=tmp_path, scm=None, llm=None,
                       secrets=None, emit=lambda *a, **k: None)
@@ -398,7 +398,7 @@ def test_a_repair_that_does_not_fix_anything_is_reported_as_a_failure_not_as_gre
 
 
 def test_an_empty_command_never_counts_as_a_passing_check(tmp_path):
-    from minifactory.plugins.builtin.util import run_shell
+    from minifactory.plugins.builtin.support.shell import run_shell
 
     rc, out = run_shell("   ", tmp_path)
     assert rc != 0 and "empty command" in out

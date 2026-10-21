@@ -12,8 +12,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from minifactory.core.registry import register
-
-from .util import ssl_context
+from minifactory.plugins.builtin.support.tls import ssl_context
 
 
 def _edit(path: str, content: str) -> str:

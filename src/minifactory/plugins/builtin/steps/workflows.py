@@ -14,9 +14,8 @@ from minifactory.core.errors import FactoryError
 from minifactory.core.models import Artifact, StepResult
 from minifactory.core.registry import register
 from minifactory.core.workflow import load_workflow
+from minifactory.plugins.builtin.support.git import git
 from minifactory.review import review
-
-from .util import git
 
 _NAME = re.compile(r"^[a-z][a-z0-9_-]{1,60}$")
 

@@ -11,8 +11,8 @@ from minifactory import stacks
 from minifactory.core.context import Step, StepContext, StrictParams
 from minifactory.core.models import StepResult
 from minifactory.core.registry import register
-
-from .util import commit_all, run_shell, safe_path
+from minifactory.plugins.builtin.support.git import commit_all
+from minifactory.plugins.builtin.support.shell import run_shell, safe_path
 
 
 def profile_for(ctx: StepContext, name: str | None) -> stacks.StackProfile:

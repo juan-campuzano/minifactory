@@ -11,20 +11,19 @@ from minifactory import stacks
 from minifactory.core.context import Step, StepContext, StrictParams
 from minifactory.core.models import StepResult
 from minifactory.core.registry import register
-
-from .steps_stack import optional_profile
-from .util import (
+from minifactory.plugins.builtin.steps.stack import optional_profile
+from minifactory.plugins.builtin.support.edits import (
     SYSTEM_PROMPT,
     PatchError,
     apply_edits,
     apply_reply,
     collect_files,
-    commit_all,
     file_blocks,
     parse_edits,
-    run_shell,
 )
-from .util import first_json_object as _first_json_object
+from minifactory.plugins.builtin.support.git import commit_all
+from minifactory.plugins.builtin.support.shell import run_shell
+from minifactory.plugins.builtin.support.text import first_json_object as _first_json_object
 
 
 class MigrateParams(StrictParams):

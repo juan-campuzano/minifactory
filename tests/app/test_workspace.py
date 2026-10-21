@@ -5,8 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from minifactory import cli, templates, workspace
-from minifactory import router as R
+from minifactory import ask as R
+from minifactory import templates, workspace
+from minifactory.cli import commands as cli
 from minifactory.cli import main
 from minifactory.core import registry
 from minifactory.core.errors import FactoryError, RoutingError
@@ -179,7 +180,7 @@ def test_package_version_matches_pyproject():
 
     import minifactory
 
-    root = Path(__file__).parent.parent
+    root = Path(__file__).parents[2]
     declared = tomllib.loads((root / "pyproject.toml").read_text())["project"]["version"]
     assert minifactory.__version__ == declared
 
@@ -188,7 +189,7 @@ def test_the_console_script_is_named_after_the_package_and_nothing_claims_the_ba
     """`factory` is also the import name of factory_boy: we must not install over it or its command."""
     import tomllib
 
-    root = Path(__file__).parent.parent
+    root = Path(__file__).parents[2]
     meta = tomllib.loads((root / "pyproject.toml").read_text())
     assert meta["project"]["scripts"] == {"minifactory": "minifactory.cli:main"}
     assert not (root / "src" / "factory").exists()

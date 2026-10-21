@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pytest
 
+from minifactory.cli.demo import demo_init
 from minifactory.core import registry
 from minifactory.core.engine import Engine
 from minifactory.core.workflow import load_workflow
-from minifactory.demo import demo_init
 
-WORKFLOW = (Path(__file__).parent.parent / "src" / "minifactory" / "templates"
+WORKFLOW = (Path(__file__).parents[2] / "src" / "minifactory" / "templates"
             / "java-migration-demo" / "workflow.yaml")
 registry.load_plugins()
 

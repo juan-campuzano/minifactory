@@ -5,11 +5,11 @@ tools: [flutter]   # not enforced: FACTORY_FLUTTER=fake simulates it for demos
 detect: [pubspec.yaml]
 manifest: pubspec.yaml
 scaffold:
-  - "{python} -m minifactory.plugins.builtin.flutter_tool create --project-name {name} --org com.example ."
+  - "{python} -m minifactory.plugins.builtin.tools.flutter_tool create --project-name {name} --org com.example ."
 commands:
-  analyze: "{python} -m minifactory.plugins.builtin.flutter_tool analyze"
-  test: "{python} -m minifactory.plugins.builtin.flutter_tool test"
-  test_files: "{python} -m minifactory.plugins.builtin.flutter_tool test {paths}"
+  analyze: "{python} -m minifactory.plugins.builtin.tools.flutter_tool analyze"
+  test: "{python} -m minifactory.plugins.builtin.tools.flutter_tool test"
+  test_files: "{python} -m minifactory.plugins.builtin.tools.flutter_tool test {paths}"
 source_globs: ["lib/**/*.dart"]
 test_globs: ["test/**/*.dart"]
 test_prefixes: ["test/"]

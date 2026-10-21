@@ -13,8 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from minifactory import stacks
 from minifactory.core.models import Job
 from minifactory.core.registry import register
-
-from .util import first_json_object
+from minifactory.plugins.builtin.support.text import first_json_object
 
 UNSUPPORTED = "unsupported"
 

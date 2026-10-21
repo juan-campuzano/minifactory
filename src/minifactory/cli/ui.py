@@ -17,7 +17,7 @@ from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 
-from .core.models import JobResult
+from minifactory.core.models import JobResult
 
 BANNER = r"""
    ┌─┐ ┌─┐        ░▒▓ minifactory ▓▒░

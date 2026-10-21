@@ -6,8 +6,8 @@ import pytest
 import yaml
 from rich.console import Console
 
-from minifactory import doctor, workspace
-from minifactory.cli import main
+from minifactory import workspace
+from minifactory.cli import doctor, main
 from minifactory.core import registry
 from minifactory.core.workflow import WorkflowSpec
 

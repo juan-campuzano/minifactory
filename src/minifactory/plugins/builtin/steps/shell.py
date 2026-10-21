@@ -6,8 +6,7 @@ from __future__ import annotations
 from minifactory.core.context import Step, StepContext, StrictParams
 from minifactory.core.models import StepResult
 from minifactory.core.registry import register
-
-from .util import run_shell, safe_path
+from minifactory.plugins.builtin.support.shell import run_shell, safe_path
 
 
 class ShellParams(StrictParams):

@@ -13,9 +13,8 @@ from typing import Any
 from minifactory.core.errors import RoutingError
 from minifactory.core.models import Candidate, Decision
 from minifactory.core.registry import register
-
-from .providers_misc import EnvSecrets
-from .util import ssl_context
+from minifactory.plugins.builtin.providers.secrets import EnvSecrets
+from minifactory.plugins.builtin.support.tls import ssl_context
 
 NONE = "none"  # reserved answer: no workflow fits
 

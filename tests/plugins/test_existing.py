@@ -6,13 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from minifactory import cli
+from minifactory.cli import commands as cli
 from minifactory.core import registry
 from minifactory.core.engine import Engine
 from minifactory.core.workflow import WorkflowSpec, validate_spec
-from minifactory.plugins.builtin.intakes import REPO_TASK_SYSTEM, RepoTaskIntake, repo_task_job
-from minifactory.plugins.builtin.providers_github import GitHub
-from minifactory.plugins.builtin.util import git
+from minifactory.plugins.builtin.providers.github import GitHub
+from minifactory.plugins.builtin.routing.intakes import REPO_TASK_SYSTEM, RepoTaskIntake, repo_task_job
+from minifactory.plugins.builtin.support.git import git
 
 registry.load_plugins()
 
@@ -173,7 +173,7 @@ def test_locate_fails_when_nothing_selected_exists(world):
 def run_shell_step(cmd, tmp_path, **kw):
     from minifactory.core.context import StepContext
     from minifactory.core.models import Job
-    from minifactory.plugins.builtin.steps_build import ShellRun
+    from minifactory.plugins.builtin.steps.shell import ShellRun
 
     ctx = StepContext(job=Job(id="j", name="j"), work_dir=tmp_path, scm=None, llm=None, secrets=None,
                       emit=lambda *a, **k: None)
@@ -226,6 +226,6 @@ def test_github_addresses_existing_repos_as_owner_name():
 def test_the_fix_bug_template_is_valid_and_delivers_to_the_repo_itself(tmp_path):
     from minifactory.core.workflow import load_workflow
 
-    spec = load_workflow(Path(__file__).parent.parent / "src/minifactory/templates/fix-bug/workflow.yaml")
+    spec = load_workflow(Path(__file__).parents[2] / "src/minifactory/templates/fix-bug/workflow.yaml")
     assert spec.route.delivery == "fixed" and spec.route.intake == "repo-task"
     assert [s.id for s in spec.steps][:6] == ["guard", "clone", "detect", "baseline", "locate", "repro"]

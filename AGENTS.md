@@ -34,7 +34,7 @@ FACTORY_FLUTTER=fake minifactory run ...                # simulated flutter (tes
 2. A `router` plugin (`jev` = TypeSafe Jev via HTTP, needs `TYPESAFE_API_KEY`; `keyword` = offline) returns a `Decision`
    (choice or None, confidence, probabilities, actionable). For Jev, `actionable` comes from one Noul per workflow built from its
    `route.needs` (what a request must contain to start); only the chosen workflow's answer is used.
-3. Policy is in code (`src/minifactory/router.py: check`): `--yes` only acts when choice != none, confidence >= threshold and actionable;
+3. Policy is in code (`src/minifactory/ask.py: check`): `--yes` only acts when choice != none, confidence >= threshold and actionable;
    interactively a vague-but-clear request continues to the drafted input (with a warning), and a low-confidence one lets you pick from the ranking. Nothing runs without confirmation unless `--yes`.
 4. The workflow's `intake` plugin (`app-spec`) drafts the Job with the workflow's own `llm` provider; the user text is wrapped as
    data and the result is validated (name must be `^[a-z][a-z0-9_]{1,40}$`). Fixture-LLM workflows cannot draft new specs, so only
@@ -47,21 +47,44 @@ To make a workflow routable: add `route:` and, if its input isn't an app spec, r
 - `--output github [--owner X] [--public]`: provider `github` (uses `gh`, so `gh auth login` is the only credential) creates a PRIVATE repo
   (README initial commit), pushes branch `factory/<name>` and opens a PR. Public needs `--public`.
 - No flag + a terminal: asked interactively. No flag + no terminal or `--yes`: refuses (never guesses a destination).
-- Both are `scm` providers; `with_output` in `router.py` swaps the workflow's `scm` block. `OpenPR` labels the artifact via
+- Both are `scm` providers; `with_output` in `ask.py` swaps the workflow's `scm` block. `OpenPR` labels the artifact via
   `scm.delivery_kind` ("pull_request" / "folder"). `scm.target(name)` is shown before running.
 
 ## Layout
-- `src/minifactory/core/`: engine, workflow validation, registry, events, expression language, ports. **Never imports a plugin.**
-- `src/minifactory/plugins/builtin/`: `providers_*.py` (scm/llm/secrets/source/executor), `steps_*.py` (steps),
-  `flutter_tool.py` + `fake_flutter.py` (flutter CLI shim and its deterministic fake), `util.py` (git, shell, edit protocol).
-- `src/minifactory/router.py`: discovery + confidence policy for `ask`. Plugins: `routers.py` (kind `router`), `intakes.py` (kind `intake`).
-- `src/minifactory/ui.py`: the pretty CLI (rich live board + summary). Only an event subscriber; `cli.py` falls back to plain sinks.
-- `src/minifactory/workspace.py` (find/init/config), `src/minifactory/templates.py` + `src/minifactory/templates/` (packaged workflows and their `assets/`: specs = jobs, fixtures = canned LLM replies).
-- `assets/brand/`: logo kit (svg/png/favicon, palette in its README; `python3 assets/brand/_build/build.py` regenerates it). README images use ABSOLUTE
-  raw.githubusercontent URLs because PyPI does not resolve relative paths; use the PNGs there (PyPI strips `<picture>`, so the `<img>` fallback is the light logo).
-  Binaries live in git history forever: commit a changed PNG deliberately, not on every tweak.
-- `examples/` (plugin example), `docs/plugins.md`, `tests/`.
-- Run artifacts: `.minifactory/runs/<workflow>/<job>/{state.json,result.json,work/}` and `events.jsonl`. Generated, git-ignored.
+```
+src/minifactory/
+  core/                 the engine: workflow validation, registry, events, expressions, ports. Imports nothing else of minifactory.
+  plugins/builtin/      what registers itself (the core never imports it); one folder per kind of thing:
+    steps/                shell, agent, existing, flutter, scm, stack, workflows
+    providers/            scm (local-git, local-dir), github, llm, bedrock, secrets, sources, executors
+    routing/              routers (jev, keyword) and intakes (app-spec, repo-task, workflow-goal)
+    support/              helpers shared by plugins: git, shell, edits (FILE/PATCH protocol), text, tls. Not plugins.
+    tools/                programs run as subprocesses (flutter_tool, fake_flutter): standard library only
+  stacks.py templates.py catalog.py review.py workspace.py ask.py     domain services, one concern each
+  cli/                  commands.py (argparse + dispatch), ui.py (rich), doctor.py, demo.py: everything that prints
+  profiles/             stack profiles (YAML data)       templates/   packaged workflows + their assets (YAML data)
+tests/                  core/  plugins/  app/ mirror the code; test_architecture.py enforces the rules below
+assets/brand/           logo kit (python3 assets/brand/_build/build.py regenerates it). README images use ABSOLUTE
+                        raw.githubusercontent URLs (PyPI does not resolve relative paths; use PNGs: PyPI strips <picture>).
+                        Binaries live in git history forever: commit a changed PNG deliberately.
+docs/  examples/        plugin and stack guides; a minimal plugin
+```
+Run artifacts: `.minifactory/runs/<workflow>/<job>/{state.json,result.json,work/}` and `events.jsonl`. Generated, git-ignored.
+Keep your own experiments (a workspace, `output/`) out of the repo root: use a git-ignored `dev/` folder and run `minifactory` from there.
+
+### Where does new code go?
+| You are adding | It goes in | Rules (enforced by `tests/test_architecture.py`) |
+|---|---|---|
+| a step | `plugins/builtin/steps/<family>.py` | may use `support/`, the core and domain services; never `cli`/`ask`/another plugin kind |
+| a scm / llm / secrets / source / executor / runner | `plugins/builtin/providers/` | same |
+| a router or intake | `plugins/builtin/routing/` | may also use `providers.secrets` |
+| a helper two plugins need | `plugins/builtin/support/` | may only use other `support` modules and the core |
+| a command, or anything that prints | `cli/` | the only layer allowed to depend on everything |
+| language knowledge | a YAML in `profiles/` (never code) | see `docs/stacks.md` |
+| a policy used by several commands | a domain module at the top level | the test lists the allowed ones: adding a module is a decision |
+A new top-level module or folder, a loose file in `plugins/builtin/`, a loose test in `tests/`, or a module over 450 lines fails the test:
+the fix is to place it in a layer or split it. Data files (YAML) must be listed in `package-data` (`test_packaging.py`), or they work from a
+checkout and vanish from the wheel (this happened to `profiles/` in 0.0.2a1).
 
 ## Changing existing repositories (`fix-bug` template)
 `minifactory ask "fix X in owner/repo: ..."` -> router -> `repo-task` intake (needs `owner/name` literally in the text; the LLM only extracts it,
@@ -121,7 +144,7 @@ workflow resolve from the workspace root**; a file path given on the command lin
 `run_shell` adds `src/` to `PYTHONPATH` only for a source checkout.
 
 ## Doctor (`minifactory doctor`)
-`src/minifactory/doctor.py`: every machine fact goes through `System` (which/run/getenv/has_module/aws), so tests use a fake one. Without a workflow:
+`src/minifactory/cli/doctor.py`: every machine fact goes through `System` (which/run/getenv/has_module/aws), so tests use a fake one. Without a workflow:
 core, one line per stack profile (a missing toolchain is `info`, not a failure), bedrock/AWS (credentials found + region, never the credentials),
 `TYPESAFE_API_KEY` set or not, git/gh, and informational agent CLIs (claude, copilot, gemini, codex) and isolation tools (srt, bwrap, sandbox-exec,
 docker, podman) marked "not used yet". With a workflow: its needs are derived from its providers and steps (bedrock -> boto3 + credentials, github -> gh,
@@ -141,11 +164,12 @@ Package, import name and command are all `minifactory` (the bare name `factory` 
 4. LLM output is untrusted. Validate with pydantic (`agent.plan_app`), confine paths with `safe_path`, bound loops with budgets
    (`max_attempts`, `max_unproductive`, `max_features`, `max_context_chars`). Follow every agent step with a deterministic gate.
 5. Enrichment (coverage, work items...) uses `blocking: false`: it may annotate the PR but never stop it.
-6. Tests must not need the network, credentials or the Flutter SDK: use the `fixture`/`scripted` LLMs and `fake_flutter`.
+6. The folder layout is a rule, not a habit: see "Where does new code go?" and `tests/test_architecture.py`.
+7. Tests must not need the network, credentials or the Flutter SDK: use the `fixture`/`scripted` LLMs and `fake_flutter`.
 
 ## Python standards (new and changed code)
 - Full type hints; `mypy --strict`-clean; pydantic models for any data crossing a step boundary.
-- No bare `except`, no `print` outside `cli.py` (use `ctx.emit` events), `pathlib` over `os.path`.
+- No bare `except`, no `print` outside `cli/` (use `ctx.emit` events), `pathlib` over `os.path`.
 - Shell only through `util.run_shell` (it sets `PYTHONPATH` so `python -m minifactory...` works from step commands).
 - Small, surgical diffs: don't reformat or "improve" code you weren't asked to touch; mention unrelated issues instead.
 - Every new plugin ships with a test; every bug fix ships with a test that failed before.

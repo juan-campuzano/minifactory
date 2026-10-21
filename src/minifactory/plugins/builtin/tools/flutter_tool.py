@@ -1,4 +1,4 @@
-"""`python -m minifactory.plugins.builtin.flutter_tool [--tool real|fake|auto] <flutter args>`.
+"""`python -m minifactory.plugins.builtin.tools.flutter_tool [--tool real|fake|auto] <flutter args>`.
 
 Which flutter runs is explicit: `--tool` > $FACTORY_FLUTTER > `auto`. `auto` and `real` use the
 real SDK on PATH and FAIL if it is missing: silently producing a fake project is worse than an
@@ -20,7 +20,7 @@ def command(tool: str | None = None) -> list[str]:
     if mode not in MODES:
         raise ValueError(f"unknown flutter tool '{mode}' (expected one of {MODES})")
     if mode == "fake":
-        return [sys.executable, "-m", "minifactory.plugins.builtin.fake_flutter"]
+        return [sys.executable, "-m", "minifactory.plugins.builtin.tools.fake_flutter"]
     real = shutil.which("flutter")
     if real is None:
         raise FileNotFoundError(

@@ -19,15 +19,17 @@ step an AI agent takes is fenced in by deterministic checks, budgets and a human
 > [Limitations](#limitations) for what has and has not been verified.
 
 ```
-┌──────────────── core (src/minifactory/core) ────────────────┐
-│ engine · workflow validation · registry · events · expr │   knows nothing about
-└───────────────────────────┬─────────────────────────────┘   languages, git hosts or LLMs
-   ports: scm · llm · secrets · source · executor · router · intake
-                            │
-┌───────────── plugins (src/minifactory/plugins/builtin) ─────┐
-│ github · local-git · bedrock · openai · jev router      │
-│ shell.run · agent.edit · flutter.* · scm.open_pr · ...  │
-└─────────────────────────────────────────────────────────┘
+┌─ core (src/minifactory/core) ────────────────────────────────────┐
+│ engine · workflow validation · registry · events · expressions   │
+└──────────────────────────────────────────────────────────────────┘
+  knows nothing about languages, git hosts or LLMs; those sit behind ports:
+  scm · llm · secrets · source · executor · router · intake
+
+┌─ plugins (src/minifactory/plugins/builtin) ──────────────────────┐
+│ steps/      shell · agent · stack · flutter · scm · workflows    │
+│ providers/  github · local-git · bedrock · openai · secrets      │
+│ routing/    jev and keyword routers · intakes                    │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 The rule that keeps it from becoming spaghetti: **the core never imports a plugin**; plugins register themselves.

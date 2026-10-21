@@ -7,13 +7,13 @@ from pathlib import Path
 import pytest
 import yaml
 
-from minifactory import catalog, router, templates, workspace
+from minifactory import ask, catalog, templates, workspace
 from minifactory.cli import main
 from minifactory.core import registry
 from minifactory.core.engine import Engine
 from minifactory.core.models import Job
 from minifactory.core.workflow import WorkflowSpec, load_workflow, validate_spec
-from minifactory.plugins.builtin.intakes import WorkflowGoalIntake
+from minifactory.plugins.builtin.routing.intakes import WorkflowGoalIntake
 from minifactory.review import review
 
 registry.load_plugins()
@@ -117,7 +117,7 @@ def test_a_valid_draft_is_saved_as_a_draft_and_is_not_routable(ws):
     assert saved.is_file() and result.artifacts[0].kind == "workflow_draft"
     assert any("runs a shell command" in n for n in result.notes)  # the review travels with the result
     assert WorkflowLLM.calls == ["draft"]  # valid first time: no repair call
-    routable = router.discover(workspace.find(ws).workflow_dirs)  # drafts are invisible to `ask` until enabled
+    routable = ask.discover(workspace.find(ws).workflow_dirs)  # drafts are invisible to `ask` until enabled
     assert "create-workflow" in routable and "run-tests-pr" not in routable
 
 
@@ -169,7 +169,7 @@ def test_enable_moves_a_reviewed_draft_into_the_active_workflows(ws, capsys):
     assert "runs a shell command" in out and "enabled:" in out
     assert (ws / "workflows" / "run-tests-pr.yaml").is_file()
     assert not (ws / "workflows" / "drafts" / "run-tests-pr.yaml").exists()
-    assert "run-tests-pr" in router.discover(workspace.find(ws).workflow_dirs)
+    assert "run-tests-pr" in ask.discover(workspace.find(ws).workflow_dirs)
 
 
 def test_enable_without_confirmation_changes_nothing(ws, capsys):
@@ -202,7 +202,7 @@ def test_the_create_workflow_template_is_valid_and_delivers_to_its_own_target():
 
 
 def test_a_refusal_is_reported_by_its_conclusion_not_its_preamble():
-    from minifactory.plugins.builtin.steps_existing import _what_it_said
+    from minifactory.plugins.builtin.steps.existing import _what_it_said
 
     long = "I need to analyze this. " * 40 + "In conclusion no step can post to Slack."
     assert _what_it_said("some analysis\nMISSING: a Slack step\nmore") == "MISSING: a Slack step"

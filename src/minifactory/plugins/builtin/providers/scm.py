@@ -9,8 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from minifactory.core.registry import register
-
-from .util import commit_all, git
+from minifactory.plugins.builtin.support.git import commit_all, git
 
 
 @register("scm", "local-git")

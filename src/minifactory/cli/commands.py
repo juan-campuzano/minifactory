@@ -99,7 +99,7 @@ def _execute(engine: Engine, bus: EventBus, jobs, args) -> None:
 
     spec = engine.spec
     if sys.stdout.isatty() and not args.plain:
-        from minifactory.ui import LiveBoard, banner
+        from minifactory.cli.ui import LiveBoard, banner
 
         board = LiveBoard([j.id for j in jobs], [s.id for s in spec.steps])
         banner(board.console)
@@ -130,8 +130,8 @@ def _pick_output(console, args) -> str | None:
 def _ask(args) -> int:
     from rich.console import Console
 
-    from minifactory import router as R
-    from minifactory.ui import show_decision, show_spec
+    from minifactory import ask as R
+    from minifactory.cli.ui import show_decision, show_spec
 
     console = Console()
     routables = R.discover(args.workflow_dirs)
@@ -280,7 +280,7 @@ def _enable(args: argparse.Namespace, ws: workspace.Workspace | None) -> int:
 
 
 def _doctor(args: argparse.Namespace, ws: workspace.Workspace | None) -> int:
-    from minifactory import doctor
+    from minifactory.cli import doctor
 
     spec = load_workflow(_resolve_workflow(args.workflow, args.workflow_dirs)) if args.workflow else None
     checks = doctor.run_checks(doctor.System(), ws, workflow=spec, online=args.online)
@@ -345,7 +345,7 @@ def main(argv: list[str] | None = None) -> int:
             return _doctor(args, ws)
 
         if args.cmd == "demo-init":
-            from minifactory.demo import demo_init
+            from minifactory.cli.demo import demo_init
 
             path = demo_init(args.dir)
             print(f"demo sandbox ready in ./{path}")

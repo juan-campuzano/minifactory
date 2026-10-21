@@ -12,8 +12,8 @@ from typing import Literal
 from minifactory.core.context import Step, StepContext, StrictParams
 from minifactory.core.models import StepResult
 from minifactory.core.registry import register
-
-from .util import commit_all, run_shell
+from minifactory.plugins.builtin.support.git import commit_all
+from minifactory.plugins.builtin.support.shell import run_shell
 
 Tool = Literal["auto", "real", "fake"]
 
@@ -21,7 +21,7 @@ Tool = Literal["auto", "real", "fake"]
 def _run(ctx: StepContext, args: str, timeout: int, tool: Tool | None) -> tuple[int, str]:
     """`tool=None` defers to $FACTORY_FLUTTER, then to the real SDK (see flutter_tool)."""
     flag = f" --tool {tool}" if tool else ""
-    cmd = f"{shlex.quote(sys.executable)} -m minifactory.plugins.builtin.flutter_tool{flag} {args}"
+    cmd = f"{shlex.quote(sys.executable)} -m minifactory.plugins.builtin.tools.flutter_tool{flag} {args}"
     return run_shell(cmd, ctx.repo_dir, timeout)
 
 

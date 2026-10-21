@@ -10,8 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from minifactory.core.registry import register
-
-from .util import commit_all, git
+from minifactory.plugins.builtin.support.git import commit_all, git
 
 # (argv, cwd) -> (returncode, stdout, stderr). Injectable so tests never touch GitHub.
 Runner = Callable[[list[str], Path | None], tuple[int, str, str]]
