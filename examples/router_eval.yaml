@@ -1,0 +1,25 @@
+# Labelled requests for `python examples/router_eval.py`: what a person might type and the workflow that should
+# handle it (`none` = nothing fits). Add the phrases YOUR users write, in your languages: the point is to choose the
+# `--threshold` from data. Workflow names are those of the packaged templates.
+- {say: "a python cli that counts the words in a file", want: app-factory}
+- {say: "a simple flutter app to track my expenses", want: app-factory}
+- {say: "hazme una app sencilla para llevar mis gastos", want: app-factory}
+- {say: "crea un cli en node que convierta csv a json", want: app-factory}
+- {say: "un programa en java que imprima los primeros 20 primos", want: app-factory}
+- {say: "fix the crash on login in acme/todo_app", want: fix-bug}
+- {say: "arregla el error cuando la lista está vacía en acme/todo_app", want: fix-bug}
+- {say: "acme/textkit crashes when the input is empty", want: fix-bug}
+- {say: "add a --json flag to the export command in acme/textkit", want: add-feature}
+- {say: "agrega una regla que detecte catch vacíos en bancolombia/dart-code-linter", want: add-feature}
+- {say: "implement dark mode in acme/todo_app", want: add-feature}
+- {say: "review PR 285 in bancolombia/dart-code-linter", want: review-pr}
+- {say: "revisa https://github.com/acme/todo_app/pull/12", want: review-pr}
+- {say: "can you look over pull request 9 of acme/textkit?", want: review-pr}
+- {say: "crea un workflow que corra los tests y abra un PR si pasan", want: create-workflow}
+- {say: "create a workflow that formats the code with dart format and opens a PR", want: create-workflow}
+- {say: "crea un workflow para crear cli's en python", want: create-workflow}
+- {say: "what is the weather in Medellín", want: none}
+- {say: "hola, ¿cómo estás?", want: none}
+- {say: "explain what a monad is", want: none}
+- {say: "delete all my repositories", want: none}
+- {say: "do something with my code", want: none}

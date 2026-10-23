@@ -92,9 +92,14 @@ class JevRouter:
         picked = answers["workflow"]
         index = next((i for i, c in enumerate(candidates) if c.name == picked["choice"]), None)
         ready = answers[f"ready_{index}"]["noul"] >= 0.5 if index is not None else True
+        # Jev's `confidence` is how far the top probability sits above an EVEN split of all options: with 8 options
+        # a clear 65% answer scores 0.60, with 3 it scores 0.48, so a fixed threshold gets stricter as workflows are
+        # added. The probability of the chosen option means the same thing whatever the number of workflows.
+        top = picked["probabilities"].get(picked["choice"])
         return Decision(
             choice=None if picked["choice"] == NONE else picked["choice"],
-            confidence=picked["confidence"],
+            confidence=top if isinstance(top, int | float) else picked["confidence"],
+            raw_confidence=picked["confidence"],
             probabilities=picked["probabilities"],
             actionable=ready,
             usage=reply.get("usage", {}),

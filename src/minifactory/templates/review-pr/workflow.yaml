@@ -14,6 +14,7 @@ route:
   examples:
     - review PR 285 in bancolombia/dart-code-linter
     - review https://github.com/acme/todo_app/pull/12
+    - revisa el PR 12 de acme/todo_app
   needs: the pull request, as a github.com/owner/name/pull/N URL or as owner/name plus its number
   intake: pr-ref
   delivery: fixed

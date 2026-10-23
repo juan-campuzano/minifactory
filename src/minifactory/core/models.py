@@ -70,7 +70,8 @@ class Decision(BaseModel):
     """A router's judgment about a free-text request. `choice` is None for 'no workflow fits'."""
 
     choice: str | None
-    confidence: float
+    confidence: float  # how sure the choice is, 0-1; policy (`ask.check`) compares it with the threshold
+    raw_confidence: float | None = None  # what the router itself reported, when `confidence` was recomputed
     probabilities: dict[str, float] = Field(default_factory=dict)
     actionable: bool = True  # enough information to start without asking the user
     usage: dict[str, Any] = Field(default_factory=dict)

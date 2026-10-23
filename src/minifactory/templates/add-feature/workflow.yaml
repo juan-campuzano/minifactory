@@ -15,6 +15,7 @@ route:
   examples:
     - add a rule that flags empty catch blocks in acme/linter
     - add a --json flag to the export command in acme/textkit
+    - agrega una opción --json al comando export en acme/textkit
   needs: the GitHub repository as owner/name and a description of the feature wanted
   intake: repo-feature
   delivery: fixed

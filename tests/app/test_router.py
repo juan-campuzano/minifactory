@@ -119,6 +119,22 @@ def test_jev_request_shape_and_decision_mapping():
     assert d.usage == {"input_tokens": 120, "output_tokens": 12}
 
 
+def test_the_threshold_means_the_same_with_few_or_many_workflows():
+    """Jev's own confidence measures the distance from an even split, so a clear 70% answer among 8 options reports
+    0.66 and among 3 only 0.55: a fixed threshold would reject it more the more workflows exist. The decision carries
+    the probability of the chosen workflow instead (and keeps Jev's figure for reference)."""
+    names = [f"w{i}" for i in range(8)]
+    probs = {"w0": 0.7, **{n: 0.3 / 7 for n in names[1:]}}
+    reply = {"answers": {"workflow": {"choice": "w0", "confidence": 0.66, "probabilities": probs},
+                         **{f"ready_{i}": {"noul": 0.9} for i in range(8)}}}
+    cands = [Candidate(name=n, description=f"does {n}") for n in names]
+    d = JevRouter(transport=lambda b: reply).choose("x", cands)
+    assert (d.choice, d.confidence, d.raw_confidence) == ("w0", 0.7, 0.66)
+    R.check(d, 0.7)  # acts: it IS a 70% answer
+    with pytest.raises(RoutingError):
+        R.check(d.model_copy(update={"confidence": 0.69}), 0.7)
+
+
 def test_jev_none_choice_has_no_choice():
     d = JevRouter(transport=lambda b: jev_reply(choice="none", confidence=0.9)).choose("hi", CANDIDATES)
     assert d.choice is None

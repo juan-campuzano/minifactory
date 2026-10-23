@@ -15,6 +15,8 @@ route:
     - a node script that counts the words in a file
     - a java program that prints the first twenty prime numbers
     - a simple flutter app to track my expenses
+    - una app sencilla en flutter para llevar mis gastos
+    - un cli en python que cuente las líneas de un archivo
   needs: a description of what to build; the language or platform may be stated or implied
   intake: app-spec
   delivery: choose

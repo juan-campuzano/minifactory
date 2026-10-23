@@ -248,8 +248,13 @@ See `docs/plugins.md` and `examples/hello_plugin.py`. Load it with `--plugin mod
 - Open-source readiness: MIT LICENSE (holder "Juan Campuzano", inferred from the account name: confirm). CI (`.github/workflows/ci.yml`)
   passes on Python 3.11 and 3.13 (first run 2026-10-20). `minifactory` was free on PyPI on 2026-10-20 (HTTP 404) but is NOT reserved:
   publishing needs a PyPI account and token (or Trusted Publishing), which the factory does not have.
-- `jev` router has only been tested with an injected transport (request shape follows docs.typesafe.ai/api, 2026-10-20); no live
-  call yet. The 0.7 threshold is a starting value to calibrate on real requests. Jev cost/latency not measured.
+- `jev` router: the request shape was re-checked against docs.typesafe.ai/api on 2026-10-22 (it matches); tests use an injected transport and the author's
+  early live runs worked, but no calibration exists. Jev's `confidence` measures the distance of the top probability from an EVEN split of all options, so
+  it shrinks as workflows are added (8 options: a clear 70% answer reports ~0.66; 3 options ~0.55): the router now reports the probability of the chosen
+  workflow as `Decision.confidence` (Jev's own figure stays in `raw_confidence`), so `--threshold 0.7` means "70% sure" whatever the number of workflows.
+  Calibrate the threshold with `python examples/router_eval.py` (labelled es/en requests in `router_eval.yaml`; prints, per threshold, how many requests would
+  run correctly, run WRONG or stop to ask); it has only been run with the offline `keyword` router. Jev cost/latency not measured. The router sees one
+  request at a time (no conversation context in `chat`).
 - `github` provider verified only against a fake `gh` (tests); it has NOT been run against real GitHub. Creating the first real repo
   should be done on purpose by the user. Pushes use `gh auth git-credential`, not the machine's configured git credential helper.
 - Real runs (2026-10-20, Haiku 4.5, Flutter real): a 1-line counter app succeeded and was delivered; an "expense tracker" (8 features)
