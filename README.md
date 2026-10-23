@@ -173,6 +173,19 @@ minifactory ask "a simple app to track my expenses"             # same, then ask
 4. **Where results go** is your choice for new projects: `--output local` (a plain git folder) or
    `--output github` (a new private repo plus a pull request; `--public` to change that).
 
+## As a conversation: `minifactory chat`
+```
+$ minifactory chat
+you › review the latest pull request
+  ...the router picks review-pr, but no PR was named...
+  Add details to try again (empty to drop it): PR 7 in acme/app
+  repo: acme/app · pr: 7      delivery → pull request on github.com/acme/app
+  Run it? [y/N]
+```
+The same flow as `ask` (route, draft the input, show where it would deliver, ask before running), one request after another.
+When something is missing it asks for it and retries with your answer added, instead of failing. `/workflows` lists what it can do,
+`/help` the rest, Ctrl-D leaves. It needs a terminal, and there is no `--yes`: nothing runs without your confirmation.
+
 ## Languages: stack profiles
 
 Everything language-specific is data: a **stack profile** says how to recognise a stack, how to scaffold it, which commands

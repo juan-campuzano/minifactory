@@ -41,6 +41,14 @@ FACTORY_FLUTTER=fake minifactory run ...                # simulated flutter (tes
    `app-factory`, `fix-bug` and `create-workflow` carry a `route:`.
 To make a workflow routable: add `route:` and, if its input isn't an app spec, register a new `intake` plugin.
 
+## Conversation (`minifactory chat`)
+`cli/chat_cmd.py`: a loop that calls `run_ask` once per line with a fresh Namespace (`yes=False`, `dry_run=False`, `output=None` forced, so the
+confirmations of `ask` cannot be skipped from a chat). A `RoutingError` (missing repo/PR, nothing fits) is shown and the user may add details: the new text is
+appended to the request and it is retried (max 2 follow-ups). Other `FactoryError`s are printed and the loop goes on; Ctrl-C cancels the current request; Ctrl-D or
+`/exit` leaves; `/workflows`, `/help`. Needs a TTY. Not done: memory between requests ("post that review", "same repo"), the router does not see earlier turns
+(Jev has only been given one-shot requests), and the "not run (... pass --yes)" message is shared with `ask`, so in a chat it mentions a flag that does not exist.
+Verified in a real pty (keyword router): /workflows, a request missing the PR, the follow-up, the delivery preview, declining. Tests replace `run_ask`.
+
 ## Where the result goes (`minifactory ask --output`)
 - `--output local [--output-dir DIR]` (default dir `output`): provider `local-dir` -> plain git repo `DIR/<name>` on `main`, git-ignored build
   output removed, factory notes appended to its README. Refuses to overwrite an existing folder.

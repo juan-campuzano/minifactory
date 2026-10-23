@@ -14,6 +14,7 @@ from minifactory.core.workflow import load_workflow
 
 from . import completion
 from .ask_flow import run_ask
+from .chat_cmd import run_chat
 from .completion_cmd import completion_tip, run_completion
 from .execution import execute
 from .skills_cmd import run_skills
@@ -51,6 +52,16 @@ def _parser() -> argparse.ArgumentParser:
     ask.add_argument("--runs-dir", help="default: from minifactory.yaml")
     ask.add_argument("--plain", action="store_true", help="no colours or live board")
     ask.add_argument("--plugin", action="append", default=[])
+
+    chat = sub.add_parser("chat", help="like `ask`, as a conversation: type what you need, it asks for what is missing")
+    chat.add_argument("--workflows-dir", help="default: the workspace workflows folders")
+    chat.add_argument("--router", help="router plugin (default: minifactory.yaml, then jev)")
+    chat.add_argument("--threshold", type=float, help="minimum router confidence (default: minifactory.yaml)")
+    chat.add_argument("--output-dir", help="parent folder for local results (default: minifactory.yaml)")
+    chat.add_argument("--runs-dir", help="default: from minifactory.yaml")
+    chat.add_argument("--plain", action="store_true", help="no colours or live board")
+    chat.add_argument("--plugin", action="append", default=[])
+    chat.set_defaults(owner=None, public=False)
 
     val = sub.add_parser("validate", help="check a workflow without running it")
     names["validate.workflow"] = val.add_argument("workflow", help="a workflow name or a path to a .yaml")
@@ -217,6 +228,8 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.cmd == "ask":
             return run_ask(args)
+        if args.cmd == "chat":
+            return run_chat(args)
 
         spec = load_workflow(resolve_workflow(args.workflow, args.workflow_dirs))
         if args.cmd == "validate":
