@@ -177,6 +177,22 @@ deterministic gates after the step still decide. Not done: executable skills (ne
 `skills remove`, refs with a slash in URLs, private repos beyond what plain `git clone` can reach, `validate` does not check skill names (the step fails at run time).
 Verified 2026-10-21 against a real public repo (anthropics/skills `/tree/main/skills`: 16 skills found, installed, listed); the use inside a real LLM run is tested only with a scripted LLM.
 
+## Reviewing PRs and adding features (`review-pr`, `add-feature` templates)
+`ask "review PR 285 in owner/name"` -> `pr-ref` intake (NO LLM: a github.com/o/r/pull/N URL, or exactly one `owner/name` plus `#N`/`PR N`) -> `scm.pr_fetch`
+(`gh pr view/diff` through optional methods of the github provider: `pr_view`, `pr_diff`, `pr_comment`; discards a PR that is not open or whose head
+commit already has a review: marker `<!-- minifactory-review:SHA -->`) -> `agent.review_pr` (steps/pr.py: the PR text and code are DATA; the reply is
+validated with pydantic; findings naming files not in the PR are dropped; sorted by severity; `@` mentions neutralised; one retry on invalid JSON; writes
+`review.md` in the run folder) -> `scm.pr_comment` (`when: vars.post`; posts as the user running it; a comment only, never approve/request changes).
+`add-feature`: like `fix-bug` without the red-test gate (a new feature's tests cannot compile before the feature exists, so "reproduced" would never hold):
+guard -> clone -> `stack.detect` (param `stack` pins it: `vars.stack`) -> setup -> baseline analyze (discard if red) -> locate -> ONE `agent.edit` (feature +
+tests) -> analyze/test -> repair -> diff limit (12 files / 500 lines) -> PR; intake `repo-feature` (branch `factory/feat-...`).
+Stack `dart` (profiles/dart.yaml): `detect: []` on purpose, because every Flutter app has a pubspec.yaml too; pin it. dart-code-linter also has a
+pyproject.toml, so guessing would be ambiguous anyway.
+Verified 2026-10-22: review of a real PR (bancolombia/dart-code-linter #285, Haiku 4.5, 7 s, nothing posted); the dart profile with the real SDK
+(setup + analyze on that repo, scaffold of a new package; its 776 tests pass in ~2 min). `add-feature` verified end to end with real Haiku 4.5 + dart against a local clone standing in for the remote (a `toSnakeCase()` extension + 3 tests,
+2 files / 23 lines, analyze and the 776 tests green, ~3.5 min, PR in local-git); NOT run against the real GitHub repo. Posting a comment to a real PR is verified only against a fake
+`gh`. Review quality: plausible but some findings are speculative, as with any LLM review.
+
 ## Doctor (`minifactory doctor`)
 `src/minifactory/cli/doctor.py`: every machine fact goes through `System` (which/run/getenv/has_module/aws), so tests use a fake one. Without a workflow:
 core, one line per stack profile (a missing toolchain is `info`, not a failure), bedrock/AWS (credentials found + region, never the credentials),

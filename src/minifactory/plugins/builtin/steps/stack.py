@@ -39,7 +39,7 @@ def missing_tools(profile: stacks.StackProfile) -> str:
 
 
 class DetectParams(StrictParams):
-    pass
+    stack: str | None = None  # pin the stack (e.g. `${vars.stack}`) instead of guessing it; empty = detect
 
 
 @register("step", "stack.detect")
@@ -50,6 +50,8 @@ class Detect(Step):
     Params = DetectParams
 
     def run(self, ctx: StepContext, p: DetectParams) -> StepResult:
+        if p.stack:
+            return StepResult.ok(f"{p.stack} (pinned)", stack=stacks.get(p.stack).name)
         found = stacks.detect(ctx.repo_dir)
         known = ", ".join(stacks.available())
         if not found:

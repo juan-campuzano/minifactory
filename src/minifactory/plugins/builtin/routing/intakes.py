@@ -92,6 +92,8 @@ def repo_task_job(repo: str, task: str, prefix: str = "fix") -> Job:
 class RepoTaskIntake:
     """Extract an `owner/name` repository and a bug description from free text."""
 
+    branch_prefix = "fix"
+
     def build(self, request: str, llm: Any) -> Job:
         reply = llm.complete(REPO_TASK_SYSTEM, f"<request>\n{request}\n</request>")
         try:
@@ -104,7 +106,38 @@ class RepoTaskIntake:
         if found.repo.lower() not in request.lower():  # never trust a repo the user did not write
             raise ValueError(f"the repository '{found.repo}' does not appear in your request; "
                              "write it as owner/name")
-        return repo_task_job(found.repo, found.task)
+        return repo_task_job(found.repo, found.task, self.branch_prefix)
+
+
+@register("intake", "repo-feature")
+class RepoFeatureIntake(RepoTaskIntake):
+    """Extract an `owner/name` repository and the feature wanted from free text (the branch is `factory/feat-...`)."""
+
+    branch_prefix = "feat"
+
+
+_PR_URL = re.compile(r"github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/(\d+)")
+_REPO = re.compile(r"(?<![\w/.-])([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)(?![\w/-])")
+_PR_NUMBER = re.compile(r"(?:#|\b(?:pr|pull request|pull|pr number)\s*#?\s*)(\d+)", re.IGNORECASE)
+
+
+@register("intake", "pr-ref")
+class PRRefIntake:
+    """Find the pull request in a request: a github.com/owner/name/pull/N URL, or `owner/name` plus `#N` / `PR N`.
+    No LLM: the repository and the number must be written in the text."""
+
+    def build(self, request: str, llm: Any) -> Job:
+        url = _PR_URL.search(request)
+        if url:
+            repo, number = url.group(1), int(url.group(2))
+        else:
+            repos = _REPO.findall(_PR_URL.sub("", request))
+            number_match = _PR_NUMBER.search(request)
+            if len(repos) != 1 or not number_match:
+                raise ValueError("name the pull request as a URL (https://github.com/owner/name/pull/12) or as "
+                                 "owner/name and its number (review PR #12 in owner/name)")
+            repo, number = repos[0], int(number_match.group(1))
+        return Job(id=f"{repo.replace('/', '__')}__pr{number}", name=repo, attrs={"repo": repo, "pr": number})
 
 
 @register("source", "repo-tasks")

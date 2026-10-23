@@ -11,6 +11,7 @@ from .core.workflow import WorkflowSpec
 _EFFECTS = {
     "scm.open_pr": "pushes a branch and opens a pull request",
     "scm.init_repo": "creates a repository",
+    "scm.pr_comment": "posts a public comment on a pull request, as you",
     "file.set_key": "edits a file in the repository",
 }
 _PROVIDERS = {

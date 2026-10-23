@@ -4,6 +4,7 @@ from . import (  # noqa: F401
     agent,
     existing,
     flutter,
+    pr,
     scm,
     shell,
     stack,

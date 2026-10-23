@@ -1,0 +1,40 @@
+name: dart
+description: "Dart packages and command-line programs (dart analyze, dart test with package:test). Not Flutter apps: pin it with `stack: dart`."
+requires: []
+tools: [dart]
+detect: []   # never guessed from files: every Flutter app has a pubspec.yaml too. Choose it with `stack: dart`.
+manifest: pubspec.yaml
+seed_files:
+  pubspec.yaml: |
+    name: {name}
+    description: A Dart program.
+    version: 0.1.0
+    publish_to: none
+    environment:
+      sdk: ^3.5.0
+    dev_dependencies:
+      test: ^1.25.0
+  .gitignore: |
+    .dart_tool/
+    build/
+scaffold:
+  - "dart pub get"
+commands:
+  setup: "dart pub get"
+  analyze: "dart analyze"
+  test: "dart test"
+  test_files: "dart test {paths}"
+  format: "dart format ."
+source_globs: ["lib/**/*.dart", "bin/**/*.dart"]
+test_globs: ["test/**/*.dart"]
+test_prefixes: ["test/"]
+repro_test_path: test/factory_repro_test.dart
+file_example: ["lib/{name}.dart", "test/{name}_test.dart"]
+broken_test_patterns: ["Failed to load", "Compilation failed"]
+hints: |
+  Tests use package:test (`import 'package:test/test.dart';`, `test(...)`, `group(...)`, `expect(...)`), in files
+  named *_test.dart under test/. Import project files with package:<name>/... where <name> is the `name:` in
+  pubspec.yaml; follow the conventions of the tests that already exist.
+new_project_hints: |
+  Dart 3, no packages beyond `test`. Library code in lib/, an executable in bin/<name>.dart with a main() that
+  imports package:{name}/..., tests under test/ using package:test.

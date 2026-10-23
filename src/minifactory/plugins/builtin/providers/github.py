@@ -99,3 +99,16 @@ class GitHub:
         url = self._gh("pr", "create", "--repo", self._full(repo), "--base", base, "--head", branch,
                        "--title", title, "--body", body)
         return url.splitlines()[-1]
+
+    # -- pull requests of someone's repository: read, and comment (optional capabilities: see steps/pr.py) --
+    def pr_view(self, repo: str, number: int) -> dict[str, Any]:
+        out = self._gh("pr", "view", str(number), "--repo", self._full(repo), "--json",
+                       "title,body,author,baseRefName,headRefName,headRefOid,state,isDraft,url,files,comments")
+        data: dict[str, Any] = json.loads(out)
+        return data
+
+    def pr_diff(self, repo: str, number: int) -> str:
+        return self._gh("pr", "diff", str(number), "--repo", self._full(repo))
+
+    def pr_comment(self, repo: str, number: int, body: str) -> str:
+        return self._gh("pr", "comment", str(number), "--repo", self._full(repo), "--body", body)

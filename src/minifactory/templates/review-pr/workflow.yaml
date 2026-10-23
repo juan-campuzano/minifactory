@@ -1,0 +1,55 @@
+# Reviews an existing pull request on GitHub: reads its diff, has an LLM look for real problems and (by default)
+# posts the result as ONE comment on the PR. It never approves, requests changes or merges. Reviews each commit
+# once: asking again for the same commit stops before spending anything. Needs `gh auth login` and AWS credentials
+# for Bedrock. Costs LLM tokens. Set `vars.post: false` to only write the report (see `review.md` in the run folder).
+
+name: review-pr
+
+route:
+  description: Review an existing pull request on GitHub and comment the findings on it
+  not_for:
+    - fixing a bug or adding a feature in a repository
+    - creating a new app or project
+    - merging, approving or closing pull requests
+  examples:
+    - review PR 285 in bancolombia/dart-code-linter
+    - review https://github.com/acme/todo_app/pull/12
+  needs: the pull request, as a github.com/owner/name/pull/N URL or as owner/name plus its number
+  intake: pr-ref
+  delivery: fixed
+
+vars:
+  post: true                 # false = write the report only, comment nothing
+  focus: ""                  # what to look at especially (a project's conventions, a risk...)
+
+source: { use: static, with: { jobs: [] } }   # jobs come from `minifactory ask`
+
+executor:
+  use: threads
+  with: { workers: 1 }
+
+providers:
+  scm:
+    use: github
+  llm:
+    use: bedrock
+    with:
+      model_id: "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+      region: us-east-1
+      max_tokens: 8192
+      price_per_mtok: { input: 1.0, output: 5.0 }   # USD per 1M tokens: check current prices
+
+steps:
+  - id: pr
+    use: scm.pr_fetch
+    with: { skip_if_reviewed: true, max_diff_chars: 60000 }
+    on_fail: discard
+
+  - id: review
+    use: agent.review_pr
+    with: { pr: pr, focus: "${vars.focus}", max_findings: 12 }
+
+  - id: comment
+    use: scm.pr_comment
+    when: "vars.post"
+    with: { body: "${steps.review.outputs.report}" }

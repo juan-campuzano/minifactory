@@ -1,0 +1,111 @@
+# Adds a feature to an EXISTING GitHub repository: finds the relevant files, implements it with its tests, runs the
+# repository's own analyze/test, repairs what breaks and opens a pull request. Never touches the default branch.
+# Needs `gh auth login`, AWS credentials for Bedrock and the stack's tools. Costs LLM tokens.
+# The stack is detected from the files; if the repository is ambiguous (or a pure Dart package, which `detect`
+# never guesses) set it: `vars.stack: dart`.
+
+name: add-feature
+
+route:
+  description: Add a new feature to an EXISTING GitHub repository. Implements it with tests and opens a pull request
+  not_for:
+    - fixing a bug (use the bug-fix workflow)
+    - creating a new app or project from scratch
+    - reviewing a pull request
+  examples:
+    - add a rule that flags empty catch blocks in acme/linter
+    - add a --json flag to the export command in acme/textkit
+  needs: the GitHub repository as owner/name and a description of the feature wanted
+  intake: repo-feature
+  delivery: fixed
+
+vars:
+  stack: ""                  # "" = detect from the repository files
+  max_files: 12
+  max_lines: 500
+
+source: { use: static, with: { jobs: [] } }   # jobs come from `minifactory ask`
+
+executor:
+  use: threads
+  with: { workers: 1 }
+
+providers:
+  scm:
+    use: github
+  llm:
+    use: bedrock
+    with:
+      model_id: "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+      region: us-east-1
+      max_tokens: 16384
+      price_per_mtok: { input: 1.0, output: 5.0 }   # USD per 1M tokens: check current prices
+
+steps:
+  - id: guard
+    use: scm.guard_no_open_pr
+    with: { branch: "${job.branch}" }
+
+  - id: clone
+    use: scm.clone
+
+  - id: detect
+    use: stack.detect
+    with: { stack: "${vars.stack}" }
+    on_fail: discard
+
+  - id: setup
+    use: stack.check
+    with: { check: setup, stack: "${steps.detect.outputs.stack}" }
+    on_fail: discard
+
+  # A repository that does not analyse and test cleanly cannot be judged: stop before spending anything.
+  - id: baseline
+    use: stack.check
+    with: { check: analyze, stack: "${steps.detect.outputs.stack}" }
+    on_fail: discard
+
+  - id: locate
+    use: agent.locate_files
+    with: { task: "${job.task}", stack: "${steps.detect.outputs.stack}" }
+
+  - id: implement
+    use: agent.edit
+    with:
+      stack: "${steps.detect.outputs.stack}"
+      instruction: >-
+        Implement this feature with the smallest coherent change, following the conventions of the code around it,
+        and add or extend tests that cover it. Prefer PATCH edits to existing files. Do not touch unrelated code.
+        FEATURE: ${job.task}
+      files: "${steps.locate.outputs.files}"
+      commit_message: "feat: ${job.repo}"
+
+  - id: analyze
+    use: stack.check
+    with: { check: analyze, stack: "${steps.detect.outputs.stack}" }
+    on_fail: continue
+
+  - id: test
+    use: stack.check
+    with: { check: test, stack: "${steps.detect.outputs.stack}" }
+    on_fail: continue
+
+  - id: repair
+    use: agent.repair_build
+    when: "steps.analyze.status == 'failed' or steps.test.status == 'failed'"
+    with:
+      stack: "${steps.detect.outputs.stack}"
+      checks: [analyze, test]
+      max_attempts: 3
+      max_unproductive: 2
+
+  - id: size
+    use: scm.diff_limit
+    with: { max_files: "${vars.max_files}", max_lines: "${vars.max_lines}" }
+
+  - id: deliver
+    use: scm.open_pr
+    with:
+      branch: "${job.branch}"
+      title: "feat: ${job.repo}"
+      body: "${job.task}"

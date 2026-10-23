@@ -150,8 +150,10 @@ Copy one into your workspace with `minifactory workflows copy NAME`; only copied
 | template | what it does | needs |
 |---|---|---|
 | `flutter-app-factory` | the offline demo above | nothing |
-| `app-factory` | creates a **new** project (an app, a CLI, a library) from a one-line request, in Python, Node, Java or Flutter, sized to the request | AWS credentials (Bedrock) and the stack's tools |
+| `app-factory` | creates a **new** project (an app, a CLI, a library) from a one-line request, in Python, Node, Java, Dart or Flutter, sized to the request | AWS credentials (Bedrock) and the stack's tools |
 | `fix-bug` | fixes a bug in an **existing** GitHub repo (Python, Node or Flutter, detected from its files): reproduces it with a failing test, fixes it minimally, opens a PR | `gh auth login`, AWS credentials, the stack's tools |
+| `add-feature` | adds a feature to an **existing** GitHub repo: implements it with tests, runs the repo's own analyze/test, repairs, opens a PR (never touches the default branch). Set `vars.stack` when the stack cannot be guessed (a pure Dart package: `dart`) | `gh auth login`, AWS credentials, the stack's tools |
+| `review-pr` | reviews an **existing** pull request (`review PR 12 in owner/name` or its URL): an LLM reads the diff and posts ONE comment with validated findings. Never approves or merges; reviews each commit once; `vars.post: false` only writes the report | `gh auth login`, AWS credentials |
 | `create-workflow` | drafts a **new workflow** from a plain-language goal, using only the steps and plugins that exist (see below) | AWS credentials (Bedrock) |
 | `java-migration-demo` | a batch transform over toy repos: deterministic branch vs LLM branch, baseline gate, repair loop | nothing |
 
