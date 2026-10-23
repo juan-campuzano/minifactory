@@ -253,7 +253,9 @@ See `docs/plugins.md` and `examples/hello_plugin.py`. Load it with `--plugin mod
   it shrinks as workflows are added (8 options: a clear 70% answer reports ~0.66; 3 options ~0.55): the router now reports the probability of the chosen
   workflow as `Decision.confidence` (Jev's own figure stays in `raw_confidence`), so `--threshold 0.7` means "70% sure" whatever the number of workflows.
   Calibrate the threshold with `python examples/router_eval.py` (labelled es/en requests in `router_eval.yaml`; prints, per threshold, how many requests would
-  run correctly, run WRONG or stop to ask); it has only been run with the offline `keyword` router. Jev cost/latency not measured. The router sees one
+  run correctly, run WRONG or stop to ask); run live on 2026-10-22 (22 requests, es/en, the 5 packaged templates): 22/22 correct, chosen probability >= 0.92 every time (lowest: 'do something with my code'
+  -> none at 0.92; the Spanish create-workflow phrase 0.97), so every threshold from 0.5 to 0.9 gave the same result and 0.7 stays. The set is easy: it has no genuinely
+  ambiguous or mixed requests yet, which is where a threshold matters. Jev cost/latency not measured. The router sees one
   request at a time (no conversation context in `chat`).
 - `github` provider verified only against a fake `gh` (tests); it has NOT been run against real GitHub. Creating the first real repo
   should be done on purpose by the user. Pushes use `gh auth git-credential`, not the machine's configured git credential helper.
