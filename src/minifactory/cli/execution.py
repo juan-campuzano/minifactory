@@ -22,7 +22,7 @@ def summary(results) -> None:
     print("  ".join(f"{k}: {v}" for k, v in counts.items()))
 
 
-def execute(engine: Engine, bus: EventBus, jobs, args) -> None:
+def execute(engine: Engine, bus: EventBus, jobs, args) -> list:
     """Run jobs with the live board on a terminal, plain lines otherwise."""
 
     def run_one(job):
@@ -39,10 +39,11 @@ def execute(engine: Engine, bus: EventBus, jobs, args) -> None:
         with board:
             results = engine.executor.run(jobs, run_one)
         board.summary(results)
-        return
+        return list(results)
 
     if not getattr(args, "quiet", False):
         bus.subscribe(ConsoleSink())
     print(f"workflow '{spec.name}': {len(jobs)} job(s)")
     results = engine.executor.run(jobs, run_one)
     summary(results)
+    return list(results)

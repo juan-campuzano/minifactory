@@ -21,6 +21,7 @@ def talk(monkeypatch):
 
     def run(lines, ask=None, dirs=()):
         seen = []
+        run.sessions = sessions = []
         feed = iter(lines)
 
         def fake_input(prompt=""):
@@ -32,8 +33,9 @@ def talk(monkeypatch):
                 raise item
             return item
 
-        def fake_ask(args):
+        def fake_ask(args, session=None):
             seen.append(args)
+            sessions.append(session)
             if ask:
                 return ask(args)
             return 0
@@ -124,3 +126,104 @@ def test_workflows_lists_what_ask_could_choose(talk, tmp_path, capsys):
     talk(["/workflows"], dirs=[tmp_path / "workflows"])
     out = plain(capsys.readouterr().out)
     assert "review-pr" in out and "e.g. review PR 285" in out
+
+
+# -- memory ------------------------------------------------------------------------------------------
+from minifactory.cli.chat_memory import Session  # noqa: E402
+from minifactory.core.models import Artifact, Job, JobResult, StepRecord  # noqa: E402
+
+
+def test_the_last_repo_and_pr_fill_what_a_request_leaves_out():
+    s = Session()
+    assert s.fill("review it") == ("review it", "")  # nothing known yet
+    s.drafted("review-pr", Job(id="j", name="acme/app", attrs={"repo": "acme/app", "pr": 7}))
+    assert s.fill("add a flag") == ("add a flag in acme/app", "acme/app")  # the PR number is only for PR talk
+    assert s.fill("review the PR again") == ("review the PR again in acme/app (#7)", "acme/app #7")
+    assert s.fill("review PR 8") == ("review PR 8 in acme/app", "acme/app")  # its own number wins
+    assert s.fill("review PR 8 in other/thing") == ("review PR 8 in other/thing", "")  # its own repo wins
+    s.forget()
+    assert s.fill("review the PR again")[1] == ""
+
+
+def test_a_job_without_a_repository_is_not_a_context():
+    s = Session()
+    s.drafted("app-factory", Job(id="todo", name="todo", attrs={"description": "a todo app"}))
+    assert s.fill("add a flag") == ("add a flag", "")
+
+
+def test_a_finished_run_is_remembered_with_its_outcome_and_report():
+    s = Session()
+    s.drafted("review-pr", Job(id="j", name="acme/app", attrs={"repo": "acme/app", "pr": 7}))
+    assert s.turns[-1].outcome == "not run"
+    s.finished([JobResult(job_id="j", outcome="succeeded", artifacts=[Artifact(kind="pr_comment", ref="https://x/1")],
+                          steps=[StepRecord(id="review", outputs={"report": "## Review\nall good"})])])
+    turn = s.turns[-1]
+    assert (turn.outcome, turn.detail, turn.report) == ("succeeded", "https://x/1", "## Review\nall good")
+    assert "review-pr" in s.lines()[0] and "succeeded" in s.lines()[0]
+
+
+def test_the_chat_retries_with_what_it_remembers_before_bothering_the_user(talk, capsys):
+    def ask(args):
+        session = talk.sessions[-1]
+        if "acme/app" not in args.request:
+            raise RoutingError("name the pull request as owner/name and its number")
+        session.drafted("review-pr", Job(id="j", name="acme/app", attrs={"repo": "acme/app", "pr": 7}))
+
+    rc, seen = talk(["review PR 7 in acme/app", "review the PR again"], ask=ask)
+    assert [a.request for a in seen] == ["review PR 7 in acme/app", "review the PR again",
+                                        "review the PR again in acme/app (#7)"]
+    assert "acme/app #7 from earlier" in " ".join(plain(capsys.readouterr().out).split())  # it says what it filled in
+
+
+def test_what_memory_cannot_fill_is_asked_and_forgetting_really_forgets(talk):
+    def ask(args):
+        if "acme/app" not in args.request:
+            raise RoutingError("name the repository")
+        talk.sessions[-1].drafted("fix-bug", Job(id="j", name="acme/app", attrs={"repo": "acme/app"}))
+
+    # after /forget the same request has to be completed by the user
+    rc, seen = talk(["fix it in acme/app", "/forget", "fix it again", "in acme/app"], ask=ask)
+    assert [a.request for a in seen] == ["fix it in acme/app", "fix it again", "fix it again\nin acme/app"]
+
+
+def test_history_and_last_show_what_happened(talk, capsys):
+    def ask(args):
+        talk.sessions[-1].drafted("review-pr", Job(id="j", name="acme/app", attrs={"repo": "acme/app", "pr": 7}))
+        talk.sessions[-1].finished([JobResult(job_id="j", outcome="succeeded", steps=[
+            StepRecord(id="review", outputs={"report": "THE REPORT"})])])
+
+    talk(["review PR 7 in acme/app", "/history", "/last"], ask=ask)
+    out = plain(capsys.readouterr().out)
+    assert "1." in out and "review-pr" in out and "THE REPORT" in out and "pr: 7" in out
+
+
+def test_a_real_run_tells_the_session_how_it_ended(tmp_path, monkeypatch):
+    """The wiring in ask_flow: run_ask(args, session) records the drafted job and the result."""
+    from minifactory import ask as routing
+    from minifactory.cli.ask_flow import run_ask
+    from minifactory.core import registry
+    from minifactory.core.context import Step
+    from minifactory.core.models import StepResult
+
+    @registry.register("step", "t.chatmark")
+    class Mark(Step):
+        def run(self, ctx, p):
+            return StepResult.ok("done")
+
+    @registry.register("intake", "t.chatintake")
+    class Intake:
+        def build(self, request, llm):
+            return Job(id="j1", name="acme/app", attrs={"repo": "acme/app", "pr": 3})
+
+    folder = tmp_path / "wf"
+    folder.mkdir()
+    (folder / "review-pr.yaml").write_text(
+        "name: review-pr\nroute: {description: review a pull request, intake: t.chatintake, delivery: fixed}\n"
+        "source: {use: static, with: {jobs: []}}\nproviders:\n  llm: {use: fixture, with: {path: fixtures/flutter}}\n"
+        "steps:\n  - id: mark\n    use: t.chatmark\n")
+    session = Session()
+    args = argparse.Namespace(request="review a pull request", workflow_dirs=[folder], router="keyword", threshold=0.1,
+                              yes=True, dry_run=False, output=None, output_dir="o", owner=None, public=False,
+                              runs_dir=str(tmp_path / "runs"), plain=True, plugin=[])
+    assert routing.discover([folder]) and run_ask(args, session) == 0
+    assert [(t.workflow, t.outcome, t.job.attrs["pr"]) for t in session.turns] == [("review-pr", "succeeded", 3)]

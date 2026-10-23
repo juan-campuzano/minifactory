@@ -42,12 +42,17 @@ FACTORY_FLUTTER=fake minifactory run ...                # simulated flutter (tes
 To make a workflow routable: add `route:` and, if its input isn't an app spec, register a new `intake` plugin.
 
 ## Conversation (`minifactory chat`)
-`cli/chat_cmd.py`: a loop that calls `run_ask` once per line with a fresh Namespace (`yes=False`, `dry_run=False`, `output=None` forced, so the
-confirmations of `ask` cannot be skipped from a chat). A `RoutingError` (missing repo/PR, nothing fits) is shown and the user may add details: the new text is
-appended to the request and it is retried (max 2 follow-ups). Other `FactoryError`s are printed and the loop goes on; Ctrl-C cancels the current request; Ctrl-D or
-`/exit` leaves; `/workflows`, `/help`. Needs a TTY. Not done: memory between requests ("post that review", "same repo"), the router does not see earlier turns
-(Jev has only been given one-shot requests), and the "not run (... pass --yes)" message is shared with `ask`, so in a chat it mentions a flag that does not exist.
-Verified in a real pty (keyword router): /workflows, a request missing the PR, the follow-up, the delivery preview, declining. Tests replace `run_ask`.
+`cli/chat_cmd.py`: a loop that calls `run_ask(args, session)` once per line with a fresh Namespace (`yes=False`, `dry_run=False`, `output=None` forced, so the
+confirmations of `ask` cannot be skipped from a chat). Memory is `cli/chat_memory.py: Session`: `run_ask` calls `session.drafted(workflow, job)` after the intake and
+`session.finished(results)` after the run (`execute` now returns the JobResults). Memory only COMPLETES a request that already FAILED with a `RoutingError`: it appends
+` in <last repo>` (and `(#N)` when the request talks about a PR without a number) when the request names no `owner/name`, says what it added, and retries once; the
+confirmation still shows the drafted input. Otherwise the user is asked for details (max 2 follow-ups; the answer is appended to the request). Other `FactoryError`s
+are printed and the loop goes on; Ctrl-C cancels the current request; Ctrl-D or `/exit` leaves. Commands: `/workflows /history /last /forget /help /exit`.
+Typed lines persist in `.minifactory/chat_history` (readline); the memory itself does NOT persist between sessions. Needs a TTY.
+Not done: the router does not see earlier turns (Jev has only been given one-shot requests), "post that review" as an action on a previous result, memory across
+sessions, and the "not run (... pass --yes)" message is shared with `ask`, so in a chat it mentions a flag that does not exist.
+Verified in a real pty (keyword router): /workflows, a request missing the PR, the follow-up, memory filling the repo and PR, /history, declining, history file.
+Tests replace `run_ask` except one that wires a real run to the session.
 
 ## Where the result goes (`minifactory ask --output`)
 - `--output local [--output-dir DIR]` (default dir `output`): provider `local-dir` -> plain git repo `DIR/<name>` on `main`, git-ignored build

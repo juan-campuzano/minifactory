@@ -183,8 +183,11 @@ you › review the latest pull request
   Run it? [y/N]
 ```
 The same flow as `ask` (route, draft the input, show where it would deliver, ask before running), one request after another.
-When something is missing it asks for it and retries with your answer added, instead of failing. `/workflows` lists what it can do,
-`/help` the rest, Ctrl-D leaves. It needs a terminal, and there is no `--yes`: nothing runs without your confirmation.
+It remembers the conversation: if a request leaves out the repository or the pull request ("review the PR again", "add a
+`--json` flag"), it retries with the last ones and says so; if that is not enough it asks you. `/history` lists what was done
+in this chat, `/last` shows the last one (a review's full text included), `/forget` clears the memory, `/workflows` lists what it
+can do, Ctrl-D leaves. What you typed is kept in `.minifactory/chat_history` for the up arrow. It needs a terminal, and there is
+no `--yes`: nothing runs without your confirmation, and the drafted input (repo, PR) is always shown first.
 
 ## Languages: stack profiles
 

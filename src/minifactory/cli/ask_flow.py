@@ -22,7 +22,13 @@ def pick_output(console, args) -> str | None:
     return "local" if answer == "1" else "github"
 
 
-def run_ask(args) -> int:
+def finish(session, results) -> None:
+    if session is not None:
+        session.finished(results)
+
+
+def run_ask(args, session=None) -> int:
+    """`session` (the chat's memory, optional) is told about the drafted job and how the run ended."""
     from rich.console import Console
 
     from minifactory import ask as R
@@ -69,6 +75,8 @@ def run_ask(args) -> int:
     except ValueError as e:
         raise RoutingError(str(e)) from None
     show_spec(console, chosen.spec.name, job)
+    if session is not None:
+        session.drafted(chosen.spec.name, job)
 
     output = args.output
     if chosen.spec.route.delivery == "fixed":
@@ -83,7 +91,7 @@ def run_ask(args) -> int:
         if not args.yes and (not sys.stdin.isatty() or input("Run it? [y/N] ").strip().lower() != "y"):
             console.print("not run (confirm interactively or pass --yes)")
             return 2
-        execute(engine, bus, [job], args)
+        finish(session, execute(engine, bus, [job], args))
         return 0
     if output is None and not args.dry_run:
         if not interactive:
@@ -104,5 +112,5 @@ def run_ask(args) -> int:
     if not args.yes and (not sys.stdin.isatty() or input("Run it? [y/N] ").strip().lower() != "y"):
         console.print("not run (confirm interactively or pass --yes)")
         return 2
-    execute(engine, bus, [job], args)
+    finish(session, execute(engine, bus, [job], args))
     return 0
