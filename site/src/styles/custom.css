@@ -1,0 +1,21 @@
+/* minifactory brand palette (see assets/brand/README.md) */
+:root {
+  --sl-color-accent-low: #042f2e;
+  --sl-color-accent: #14b8a6;
+  --sl-color-accent-high: #ccfbf1;
+  --sl-color-bg-nav: #0f172a;
+  --sl-color-bg-sidebar: #0f172a;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: #ccfbf1;
+  --sl-color-accent: #0f766e;
+  --sl-color-accent-high: #0f172a;
+  --sl-color-bg-nav: #f8fafc;
+  --sl-color-bg-sidebar: #f8fafc;
+}
+
+.site-title img {
+  height: 2.1rem;
+  width: auto;
+}

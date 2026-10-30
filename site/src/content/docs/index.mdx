@@ -1,0 +1,35 @@
+---
+title: minifactory
+description: A tiny, pluggable software factory where declarative YAML workflows fence AI agents inside deterministic checks, role boundaries, and budgets.
+template: splash
+hero:
+  tagline: Describe what you need. A declarative workflow does the work, and every step an AI agent takes is fenced in by role boundaries, deterministic gates, and human-reviewable results.
+  image:
+    light: ../../assets/minifactory-icon-light.svg
+    dark: ../../assets/minifactory-icon-dark.svg
+  actions:
+    - text: Get Started
+      link: /minifactory/guides/getting-started/
+      icon: right-arrow
+    - text: Role Profiles & LLMs
+      link: /minifactory/specs/roles/
+      icon: open-book
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid stagger>
+  <Card title="Declarative Workflows" icon="document">
+    YAML workflows made of typed plugin steps (`StrictParams`), validated fail-fast before anything runs. No loops or spaghetti in YAML.
+  </Card>
+  <Card title="Agents on a Leash" icon="approve-check-circle">
+    The LLM is a step, never the boss. Its output is untrusted, parsed strictly (`FILE:` / exact-match `PATCH:`), bounded by budgets, and followed by compiler & test gates.
+  </Card>
+  <Card title="Roles, Stacks & Skills as Data" icon="puzzle">
+    Define agent roles (`designer`, `developer`, `architect`, `qa`, `reviewer`) with file-path boundaries and dedicated LLMs, plus language stack profiles and `SKILL.md` guidance—all in YAML/Markdown.
+  </Card>
+  <Card title="Everything Behind Ports" icon="setting">
+    Git hosts (`github`, `local-git`, `local-dir`), LLMs (`bedrock`, `openai`, `fixture`), secrets, routers, intakes, and command runners sit behind clean ports. The core never imports a plugin.
+  </Card>
+</CardGrid>

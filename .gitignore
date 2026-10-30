@@ -14,3 +14,8 @@ dist/
 # a developer workspace used from the repo root
 /workflows/
 /minifactory.yaml
+
+# documentation site build artifacts
+site/node_modules/
+site/dist/
+site/.astro/
