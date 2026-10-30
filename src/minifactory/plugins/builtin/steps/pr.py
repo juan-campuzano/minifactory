@@ -12,10 +12,11 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from minifactory import roles
 from minifactory.core.context import Step, StepContext, StrictParams
 from minifactory.core.models import Artifact, StepResult
 from minifactory.core.registry import register
-from minifactory.plugins.builtin.steps.stack import skill_note
+from minifactory.plugins.builtin.steps.stack import role_note
 from minifactory.plugins.builtin.support.text import first_json_object
 from minifactory.skills import SkillError
 
@@ -115,6 +116,7 @@ def render(review: Review, info: dict[str, object], dropped: int) -> str:
 
 class ReviewParams(StrictParams):
     pr: str = "pr"  # id of the `scm.pr_fetch` step whose outputs are reviewed
+    role: str | None = None
     focus: str = ""  # what to pay special attention to (a project's conventions, a risk...)
     max_findings: int = 12
     skills: list[str] = Field(default_factory=list)  # installed skills (`minifactory skills add`) shown to the LLM
@@ -136,17 +138,18 @@ class ReviewPR(Step):
         if not str(info["diff"]).strip():
             return StepResult.discarded("the pull request has no diff to review")
         try:
-            skills_text = skill_note(ctx, p.skills)
-        except SkillError as e:
+            skills_text = role_note(ctx, p.role, p.skills)
+        except (roles.RoleError, SkillError) as e:
             return StepResult.failed(str(e))
         focus = f"FOCUS: {p.focus}\n" if p.focus else ""
         prompt = (f"{skills_text}{focus}At most {p.max_findings} findings, most severe first.\n\n"
                   f"<pr_title>{info['title']}</pr_title>\n<pr_description>\n{str(info['body'])[:4000]}\n</pr_description>\n"
                   f"<changed_files>\n{chr(10).join(info['files'])}\n</changed_files>\n<diff>\n{info['diff']}\n</diff>")
+        llm = ctx.llm_for(p.role)
         review = None
         for _ in range(2):
             try:
-                review = Review.model_validate(first_json_object(ctx.llm.complete(REVIEW_SYSTEM, prompt)))
+                review = Review.model_validate(first_json_object(llm.complete(REVIEW_SYSTEM, prompt)))
                 break
             except (ValidationError, ValueError) as e:
                 prompt += f"\n\nYour reply was not valid ({str(e)[:200]}). Reply again with ONLY the JSON."

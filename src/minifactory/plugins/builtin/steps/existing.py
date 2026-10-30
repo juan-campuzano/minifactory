@@ -8,11 +8,11 @@ import re
 
 from pydantic import Field
 
-from minifactory import skills, stacks
+from minifactory import roles, skills, stacks
 from minifactory.core.context import Step, StepContext, StrictParams
 from minifactory.core.models import StepResult
 from minifactory.core.registry import register
-from minifactory.plugins.builtin.steps.stack import optional_profile, skill_note
+from minifactory.plugins.builtin.steps.stack import optional_profile, role_bounds, role_note
 from minifactory.plugins.builtin.support.edits import (
     SYSTEM_PROMPT,
     PatchError,
@@ -37,6 +37,7 @@ def _what_it_said(reply: str) -> str:
 class LocateParams(StrictParams):
     task: str  # the bug report or feature request
     stack: str | None = None  # default: the job's `stack`
+    role: str | None = None
     globs: list[str] | None = None  # which tracked files may be chosen (default: the stack's, else all)
     max_files: int = 8
     max_tree: int = 400  # how many paths the LLM is shown (the most task-relevant ones if there are more)
@@ -51,6 +52,10 @@ class LocateFiles(Step):
     needs = ("llm",)
 
     def run(self, ctx: StepContext, p: LocateParams) -> StepResult:
+        try:
+            note = role_note(ctx, p.role)
+        except (roles.RoleError, skills.SkillError) as e:
+            return StepResult.failed(str(e))
         tracked = git("ls-files", cwd=ctx.repo_dir).splitlines()
         profile = optional_profile(ctx, p.stack)
         globs = p.globs or (profile.context_globs if profile else ["**/*"])
@@ -61,12 +66,12 @@ class LocateFiles(Step):
             words = set(_WORD.findall(p.task.lower()))
             tree.sort(key=lambda f: -len(words & set(_WORD.findall(f.lower()))))
             tree = sorted(tree[: p.max_tree])
-        prompt = (f"TASK: locate\nAPP: {ctx.job.name}\nREQUEST: {p.task}\n\nTRACKED FILES:\n"
+        prompt = (f"TASK: locate\nAPP: {ctx.job.name}\n{note}REQUEST: {p.task}\n\nTRACKED FILES:\n"
                   + "\n".join(f"- {f}" for f in tree)
                   + f'\n\nReply ONLY with JSON: {{"files": ["path", ...]}}: at most {p.max_files} files '
                     "from the list above that are most relevant to the request, most relevant first.")
         try:
-            chosen = first_json_object(ctx.llm.complete(SYSTEM_PROMPT, prompt))
+            chosen = first_json_object(ctx.llm_for(p.role).complete(SYSTEM_PROMPT, prompt))
             names = chosen["files"] if isinstance(chosen, dict) else []
         except (ValueError, KeyError, TypeError) as e:
             return StepResult.failed(f"could not read the file selection: {e}")
@@ -79,6 +84,7 @@ class LocateFiles(Step):
 class EditParams(StrictParams):
     instruction: str
     stack: str | None = None  # default: the job's `stack`; its hints are shown to the LLM
+    role: str | None = None
     tests_only: bool = False  # the edit may only touch the stack's test folders (a reproduction test)
     files: list[str] = Field(default_factory=list)  # context: shown to the LLM in full (often a templated list)
     extra_files: list[str] = Field(default_factory=list)  # more context files, added to `files`
@@ -98,23 +104,21 @@ class Edit(Step):
 
     def run(self, ctx: StepContext, p: EditParams) -> StepResult:
         profile = optional_profile(ctx, p.stack)
-        if p.tests_only and not profile:
-            return StepResult.failed("`tests_only` needs a stack (its test folders define what is allowed)")
-        prefixes = [*p.allowed_prefixes, *(profile.test_prefixes if p.tests_only and profile else [])]
+        try:
+            allowed, forbid = role_bounds(p.role, profile, allowed_prefixes=p.allowed_prefixes, tests_only=p.tests_only)
+            note = role_note(ctx, p.role, p.skills)
+        except (roles.RoleError, skills.SkillError) as e:
+            return StepResult.failed(str(e))
         shown = collect_files(ctx.repo_dir, [*p.files, *p.extra_files], [], p.max_context_chars)
         extra = f"\nADDITIONAL CONTEXT:\n{p.extra[-4000:]}\n" if p.extra else ""
         name = stacks.project_name(ctx.job.name)
-        stack_note = stacks.guidance(profile, name, new_project=False) if profile else ""
-        try:
-            stack_note += skill_note(ctx, p.skills)
-        except skills.SkillError as e:
-            return StepResult.failed(str(e))
+        stack_note = (stacks.guidance(profile, name, new_project=False) if profile else "") + note
         where = f"REPRO_TEST_PATH: {profile.repro_test_path}\n" if p.tests_only and profile else ""
         prompt = (f"TASK: edit\nAPP: {ctx.job.name}\n{stack_note}{where}{p.instruction}\n{extra}\n"
                   f"{file_blocks(ctx.repo_dir, shown)}")
-        reply = ctx.llm.complete(SYSTEM_PROMPT, prompt)
+        reply = ctx.llm_for(p.role).complete(SYSTEM_PROMPT, prompt)
         try:
-            changed = apply_reply(ctx.repo_dir, reply, prefixes or None)
+            changed = apply_reply(ctx.repo_dir, reply, allowed, forbid)
         except PatchError as e:
             return StepResult.failed(str(e))
         if not changed:

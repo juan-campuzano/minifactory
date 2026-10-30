@@ -216,21 +216,26 @@ def agent_tool_checks(system: System) -> list[Check]:
 
 
 def _llm_needs(system: System, spec: WorkflowSpec, group: str) -> list[Check]:
-    llm = spec.providers.get("llm")
-    if llm is None:
-        return []
-    if llm.use == "bedrock":
+    refs = [r for r in (spec.providers.get("llm"), *spec.llms.values()) if r is not None]
+    out: list[Check] = []
+    if any(r.use == "bedrock" for r in refs):
         if not system.has_module("boto3"):
-            return [Check(group, "boto3", "fail", "not installed", _AWS_EXTRA)]
-        method, _ = system.aws()
-        return [Check(group, "AWS credentials", "ok" if method else "fail",
-                      f"via {method}" if method else "not found", "" if method else _AWS_LOGIN)]
-    if llm.use == "openai":
-        secret = str(llm.with_.get("api_key_secret", "LLM_API_KEY"))
-        present = bool(system.getenv(secret))
-        return [Check(group, secret, "ok" if present else "fail", "set" if present else "not set",
-                      "" if present else f"export {secret}=...")]
-    return []
+            out.append(Check(group, "boto3", "fail", "not installed", _AWS_EXTRA))
+        else:
+            method, _ = system.aws()
+            out.append(Check(group, "AWS credentials", "ok" if method else "fail",
+                             f"via {method}" if method else "not found", "" if method else _AWS_LOGIN))
+    seen_secrets: set[str] = set()
+    for llm in refs:
+        if llm.use == "openai":
+            secret = str(llm.with_.get("api_key_secret", "LLM_API_KEY"))
+            if secret in seen_secrets:
+                continue
+            seen_secrets.add(secret)
+            present = bool(system.getenv(secret))
+            out.append(Check(group, secret, "ok" if present else "fail", "set" if present else "not set",
+                             "" if present else f"export {secret}=..."))
+    return out
 
 
 def _stack_needs(system: System, spec: WorkflowSpec, group: str) -> list[Check]:

@@ -7,11 +7,11 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from minifactory import skills, stacks
+from minifactory import roles, skills, stacks
 from minifactory.core.context import Step, StepContext, StrictParams
 from minifactory.core.models import StepResult
 from minifactory.core.registry import register
-from minifactory.plugins.builtin.steps.stack import optional_profile, skill_note
+from minifactory.plugins.builtin.steps.stack import optional_profile, role_bounds, role_note
 from minifactory.plugins.builtin.support.edits import (
     SYSTEM_PROMPT,
     PatchError,
@@ -29,6 +29,7 @@ from minifactory.plugins.builtin.support.text import first_json_object as _first
 class MigrateParams(StrictParams):
     instruction: str
     files: list[str]
+    role: str | None = None
     commit_message: str = "chore: automated migration"
 
 
@@ -40,8 +41,12 @@ class LLMMigrate(Step):
     needs = ("llm",)
 
     def run(self, ctx: StepContext, p: MigrateParams) -> StepResult:
-        prompt = f"TASK: migrate\n{p.instruction}\n\n{file_blocks(ctx.repo_dir, p.files)}"
-        edits = parse_edits(ctx.llm.complete(SYSTEM_PROMPT, prompt))
+        try:
+            note = role_note(ctx, p.role)
+        except (roles.RoleError, skills.SkillError) as e:
+            return StepResult.failed(str(e))
+        prompt = f"TASK: migrate\n{note}{p.instruction}\n\n{file_blocks(ctx.repo_dir, p.files)}"
+        edits = parse_edits(ctx.llm_for(p.role).complete(SYSTEM_PROMPT, prompt))
         if not edits:
             return StepResult.failed("LLM returned no edits")
         changed = apply_edits(ctx.repo_dir, edits)
@@ -52,6 +57,7 @@ class LLMMigrate(Step):
 class RepairParams(StrictParams):
     verify_cmd: str = ""  # a shell command, or leave empty and use `stack` + `checks`
     stack: str | None = None
+    role: str | None = None
     checks: list[str] = Field(default_factory=list)  # e.g. [analyze, test]: the stack's commands, run in order
     new_project: bool = False  # true when repairing a project this workflow just created (layout rules apply)
     files: list[str] = Field(default_factory=list)
@@ -92,9 +98,11 @@ class RepairBuild(Step):
         context = p.context or (stacks.guidance(profile, stacks.project_name(ctx.job.name), new_project=p.new_project)
                                 if profile else "")
         try:
-            context += skill_note(ctx, p.skills)
-        except skills.SkillError as e:
+            context += role_note(ctx, p.role, p.skills)
+            allowed, forbid = role_bounds(p.role, profile)
+        except (roles.RoleError, skills.SkillError) as e:
             return StepResult.failed(str(e))
+        llm = ctx.llm_for(p.role)
         rc, out = run_cmd(ctx, verify_cmd, p.timeout)
         unproductive = 0
         for attempt in range(1, p.max_attempts + 1):
@@ -105,7 +113,7 @@ class RepairBuild(Step):
             prompt = (f"TASK: repair\nAPP: {ctx.job.name}\n{guidance}The build fails with:\n{out}\n\n"
                       f"{file_blocks(ctx.repo_dir, files)}")
             try:
-                edits = apply_reply(ctx.repo_dir, ctx.llm.complete(SYSTEM_PROMPT, prompt))
+                edits = apply_reply(ctx.repo_dir, llm.complete(SYSTEM_PROMPT, prompt), allowed, forbid)
             except PatchError as e:  # a patch that doesn't apply is an unproductive attempt, not a crash
                 edits = []
                 ctx.emit("repair_patch_rejected", attempt=attempt, error=str(e))
@@ -156,6 +164,7 @@ SIZE_HINT = {
 
 class PlanParams(StrictParams):
     stack: str | None = None  # default: the job's `stack`
+    role: str | None = None
     skills: list[str] = Field(default_factory=list)  # installed skills (`minifactory skills add`) shown to the LLM
 
 
@@ -178,9 +187,10 @@ class PlanApp(Step):
                                                           ["path/to/source_file", "path/to/test_file"])]
         stack_note = stacks.guidance(profile, name, new_project=True) if profile else ""
         try:
-            stack_note += skill_note(ctx, p.skills)
-        except skills.SkillError as e:
+            stack_note += role_note(ctx, p.role, p.skills)
+        except (roles.RoleError, skills.SkillError) as e:
             return StepResult.failed(str(e))
+        llm = ctx.llm_for(p.role)
         requested = "\n".join(f"- {f}" for f in spec.get("features", []))
         prompt = (f"TASK: plan_app\nAPP: {ctx.job.name}\nSIZE: {size}\n{stack_note}"
                   f"DESCRIPTION: {spec.get('description', '')}\nREQUESTED_FEATURES:\n{requested}\n\n"
@@ -190,7 +200,7 @@ class PlanApp(Step):
                   f'"files": {json.dumps(example)}}}]}}. '
                   "Ids are snake_case; files are paths relative to the project root.")
         for _ in range(2):
-            reply = ctx.llm.complete(SYSTEM_PROMPT, prompt)
+            reply = llm.complete(SYSTEM_PROMPT, prompt)
             try:
                 plan = AppPlan.model_validate(_first_json_object(reply))
             except ValidationError as e:
@@ -209,6 +219,7 @@ class PlanApp(Step):
 class ImplementParams(StrictParams):
     features: list[Feature]  # usually `${steps.plan.outputs.features}`
     stack: str | None = None  # default: the job's `stack`
+    role: str | None = None
     context_globs: list[str] | None = None  # default: the stack's sources, tests and manifest
     max_features: int = MAX_FEATURES
     max_context_chars: int = 60_000
@@ -231,9 +242,11 @@ class ImplementSpec(Step):
         stack_note = (stacks.guidance(profile, stacks.project_name(ctx.job.name), new_project=True)
                       if profile else "")
         try:
-            stack_note += skill_note(ctx, p.skills)
-        except skills.SkillError as e:
+            stack_note += role_note(ctx, p.role, p.skills)
+            allowed, forbid = role_bounds(p.role, profile)
+        except (roles.RoleError, skills.SkillError) as e:
             return StepResult.failed(str(e))
+        llm = ctx.llm_for(p.role)
         for feature in p.features:
             files = collect_files(ctx.repo_dir, [], globs, p.max_context_chars)
             prompt = (f"TASK: implement\nAPP: {ctx.job.name}\n{stack_note}FEATURE: {feature.id}\n"
@@ -242,7 +255,7 @@ class ImplementSpec(Step):
                       "tests (not one test per tiny behaviour), reusing what already exists below.\n\n"
                       f"{file_blocks(ctx.repo_dir, files)}")
             try:
-                changed = apply_reply(ctx.repo_dir, ctx.llm.complete(SYSTEM_PROMPT, prompt))
+                changed = apply_reply(ctx.repo_dir, llm.complete(SYSTEM_PROMPT, prompt), allowed, forbid)
             except PatchError as e:
                 return StepResult.failed(f"feature '{feature.id}': {e}", implemented=done)
             if not changed:

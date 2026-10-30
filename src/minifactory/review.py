@@ -55,6 +55,9 @@ def review(spec: WorkflowSpec) -> list[Finding]:
     for kind, ref in spec.providers.items():
         if ref.use in _PROVIDERS:
             out.append(Finding(ref.use == "github", f"provider {kind}: {ref.use} {_PROVIDERS[ref.use]}"))
+    for role_name, ref in spec.llms.items():
+        if ref.use in _PROVIDERS:
+            out.append(Finding(False, f"llm for role '{role_name}': {ref.use} {_PROVIDERS[ref.use]}"))
     if spec.route is None:
         out.append(Finding(False, "no `route:` block: `minifactory ask` will not be able to choose it"))
     return out

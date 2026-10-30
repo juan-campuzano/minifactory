@@ -29,8 +29,8 @@ class _MeteredLLM:
     Providers may also implement `complete_ex(system, prompt) -> (text, usage)` where usage
     has `input_tokens`, `output_tokens` and optionally `cost_usd`; those go into the event."""
 
-    def __init__(self, inner: Any, emit: Any):
-        self._inner, self._emit = inner, emit
+    def __init__(self, inner: Any, emit: Any, role: str | None = None):
+        self._inner, self._emit, self._role = inner, emit, role
 
     def complete(self, system: str, prompt: str) -> str:
         t0 = time.monotonic()
@@ -44,6 +44,7 @@ class _MeteredLLM:
             chars_in=len(system) + len(prompt),
             chars_out=len(out),
             duration_s=round(time.monotonic() - t0, 3),
+            **({"role": self._role} if self._role else {}),
             **usage,
         )
         return out
@@ -60,6 +61,7 @@ class Engine:
         self.secrets = self._build("secrets", spec.providers.get("secrets") or PluginRef(use="env"))
         self.scm = self._build("scm", spec.providers["scm"]) if "scm" in spec.providers else None
         self.llm = self._build("llm", spec.providers["llm"]) if "llm" in spec.providers else None
+        self.llms = {name: self._build("llm", ref) for name, ref in spec.llms.items()}
         self.source = self._build("source", spec.source)
         self.executor = self._build("executor", spec.executor)
         self.runner = self._build("runner", spec.runner)
@@ -106,6 +108,7 @@ class Engine:
             secrets=self.secrets,
             emit=emit,
             runner=self.runner,
+            llms={name: _MeteredLLM(llm, emit, role=name) for name, llm in self.llms.items()},
         )
         records: list[StepRecord] = []
         artifacts = []

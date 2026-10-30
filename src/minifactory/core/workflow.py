@@ -65,6 +65,7 @@ class WorkflowSpec(BaseModel):
     executor: PluginRef = PluginRef(use="local")
     runner: PluginRef = PluginRef(use="host")  # how commands run: see ports.Runner
     providers: dict[str, PluginRef] = Field(default_factory=dict)
+    llms: dict[str, PluginRef] = Field(default_factory=dict)  # optional role/alias -> llm provider override
     steps: list[StepSpec]
 
 
@@ -101,6 +102,8 @@ def validate_spec(spec: WorkflowSpec) -> None:
         if kind not in PROVIDER_KINDS:
             raise WorkflowError(f"unknown provider '{kind}' (expected one of {PROVIDER_KINDS})")
         registry.get(kind, spec.providers[kind].use)
+    for ref in spec.llms.values():
+        registry.get("llm", ref.use)
     if spec.route:
         registry.get("intake", spec.route.intake)
     registry.get("source", spec.source.use)
@@ -113,7 +116,9 @@ def validate_spec(spec: WorkflowSpec) -> None:
             raise WorkflowError(f"duplicate step id '{step.id}'")
         cls = registry.get("step", step.use)
         for need in cls.needs:
-            if need not in spec.providers:
+            role = step.with_.get("role")
+            has_role_llm = need == "llm" and isinstance(role, str) and role in spec.llms
+            if need not in spec.providers and not has_role_llm:
                 raise WorkflowError(
                     f"step '{step.id}' needs the '{need}' provider but the workflow defines none"
                 )

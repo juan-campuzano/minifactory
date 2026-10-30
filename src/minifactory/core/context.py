@@ -28,10 +28,15 @@ class StepContext:
     outputs: dict[str, dict[str, Any]] = field(default_factory=dict)  # step id -> outputs
     notes: list[str] = field(default_factory=list)
     runner: Any = None  # Runner: how commands run. None (tests) means the default host runner.
+    llms: dict[str, Any] = field(default_factory=dict)  # role/alias -> LLMProvider override
 
     @property
     def repo_dir(self) -> Path:
         return self.work_dir / "repo"
+
+    def llm_for(self, role: str | None = None) -> Any:
+        """The role-specific LLM if configured in `workflow.llms`, else the default `llm`."""
+        return (self.llms.get(role) if role else None) or self.llm
 
 
 class Step:

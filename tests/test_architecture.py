@@ -17,7 +17,7 @@ ROOT = Path(__file__).parents[1]
 SRC = ROOT / "src" / "minifactory"
 TESTS = ROOT / "tests"
 
-DOMAIN = {"stacks", "templates", "catalog", "review", "workspace", "ask", "skills"}
+DOMAIN = {"stacks", "templates", "catalog", "review", "workspace", "ask", "skills", "roles"}
 TOP_LEVEL_MODULES = {"__init__", "__main__", *DOMAIN}
 TOP_LEVEL_PACKAGES = {"cli", "core", "plugins", "profiles", "templates"}
 MAX_LINES = 450  # a module that grows past this wants splitting, not more lines

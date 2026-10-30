@@ -40,7 +40,7 @@ minifactory = "minifactory.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-minifactory = ["py.typed", "templates/**/*", "profiles/*.yaml"]
+minifactory = ["py.typed", "templates/**/*", "profiles/*.yaml", "profiles/roles/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

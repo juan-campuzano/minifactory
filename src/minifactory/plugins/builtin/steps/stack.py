@@ -7,7 +7,7 @@ import re
 import shutil
 from typing import Literal
 
-from minifactory import skills, stacks
+from minifactory import roles, skills, stacks
 from minifactory.core.context import Step, StepContext, StrictParams
 from minifactory.core.models import StepResult
 from minifactory.core.registry import register
@@ -31,6 +31,38 @@ def skill_note(ctx: StepContext, names: list[str]) -> str:
     if names:
         ctx.emit("skills_used", names=list(dict.fromkeys(names)), chars=len(note))
     return note
+
+
+def role_note(ctx: StepContext, role_name: str | None, skill_names: list[str] | None = None) -> str:
+    """The prompt text for `role` (its persona + its default skills) plus `skill_names`."""
+    role = roles.get(role_name) if role_name else None
+    merged = [*(role.skills if role else []), *(skill_names or [])]
+    out = roles.prompt_block(role) if role else ""
+    if role:
+        ctx.emit("role_used", role=role.name, llm="custom" if role.name in ctx.llms else "default")
+    out += skill_note(ctx, merged)
+    return out
+
+
+def role_bounds(
+    role_name: str | None,
+    profile: stacks.StackProfile | None,
+    *,
+    allowed_prefixes: list[str] | None = None,
+    tests_only: bool = False,
+) -> tuple[list[str] | None, list[str] | None]:
+    """(allowed_prefixes, forbid_prefixes) combining the step's settings with the role's."""
+    role = roles.get(role_name) if role_name else None
+    only_tests = tests_only or bool(role and role.tests_only)
+    if only_tests and not profile:
+        raise roles.RoleError("`tests_only` needs a stack (its test folders define what is allowed)")
+    allowed = [
+        *(allowed_prefixes or []),
+        *(role.allowed_prefixes if role else []),
+        *(profile.test_prefixes if only_tests and profile else []),
+    ]
+    forbid = list(role.forbid_prefixes) if role and role.forbid_prefixes else []
+    return (allowed or None), (forbid or None)
 
 
 def missing_tools(profile: stacks.StackProfile) -> str:

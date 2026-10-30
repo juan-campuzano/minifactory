@@ -121,14 +121,19 @@ def apply_patches(repo_dir: Path, patches: dict[str, list[tuple[str, str]]]) -> 
     return sorted(results)
 
 
-def apply_reply(repo_dir: Path, reply: str, allowed_prefixes: list[str] | None = None) -> list[str]:
+def apply_reply(repo_dir: Path, reply: str, allowed_prefixes: list[str] | None = None,
+                forbid_prefixes: list[str] | None = None) -> list[str]:
     """Apply FILE blocks (full content) and PATCH blocks (exact edits) from an LLM reply.
-    With `allowed_prefixes`, any path outside them is rejected before anything is written."""
+    With `allowed_prefixes` or `forbid_prefixes`, any path outside the bounds is rejected before writing."""
     files, patches = parse_edits(reply), parse_patches(reply)
     if allowed_prefixes:
         for rel in [*files, *patches]:
             if not any(rel.startswith(prefix) for prefix in allowed_prefixes):
                 raise PatchError(f"{rel}: outside the allowed paths {allowed_prefixes}")
+    if forbid_prefixes:
+        for rel in [*files, *patches]:
+            if any(rel.startswith(prefix) for prefix in forbid_prefixes):
+                raise PatchError(f"{rel}: forbidden path (matches {forbid_prefixes})")
     changed = apply_patches(repo_dir, patches) if patches else []
     changed += apply_edits(repo_dir, files) if files else []
     return sorted(set(changed))

@@ -7,7 +7,7 @@ from __future__ import annotations
 import inspect
 from typing import Any
 
-from . import stacks
+from . import roles, stacks
 from .core import registry
 
 # Constructor arguments that are injected by the engine or exist only for tests: not for a workflow author.
@@ -84,6 +84,8 @@ runner: {use: host}                         # optional: how commands run (defaul
 providers:                                  # only the ones the steps need
   scm: {use: <scm>, with: {...}}
   llm: {use: <llm>, with: {...}}
+llms:                                       # optional: per-role LLM overrides (fallback: providers.llm)
+  designer: {use: <llm>, with: {...}}
 steps:
   - id: unique_id
     use: <step name from the list below>
@@ -130,6 +132,14 @@ def render_markdown() -> str:
         "No new step is needed per language.", "",
     ]
     lines += [f"- {name}: {p.description}" for name, p in profiles.items()] + [""]
+    role_profiles = roles.available()
+    lines += [
+        "# Roles installed (personas and file boundaries for `agent.*` steps)", "",
+        "Pass `role: <name>` to any `agent.*` step to give it that role's persona, default skills and",
+        "file-path boundaries (`allowed_prefixes`, `forbid_prefixes`, `tests_only`), and to use `llms.<role>`",
+        "when configured.", "",
+    ]
+    lines += [f"- {name}: {r.description}" for name, r in role_profiles.items()] + [""]
     lines += ["# Plugins for `source`, `executor` and `providers` (`use:` + `with:` = constructor arguments)", ""]
     for kind in ("source", "executor", "scm", "llm", "secrets"):
         for name, info in d[kind].items():

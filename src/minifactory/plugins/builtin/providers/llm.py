@@ -21,10 +21,15 @@ def _edit(path: str, content: str) -> str:
 
 @register("llm", "scripted")
 class ScriptedLLM:
-    """Rule-based stand-in. Understands exactly two tasks, on a `build.cfg` file:
+    """Rule-based stand-in. Understands `replies` (in order) or two tasks on a `build.cfg` file:
     migrate (sets java_version) and repair (drops an option the build rejects)."""
 
+    def __init__(self, replies: list[str] | None = None):
+        self._replies = list(replies) if replies else []
+
     def complete(self, system: str, prompt: str) -> str:
+        if self._replies:
+            return self._replies.pop(0)
         files = dict(re.findall(r"=== FILE (\S+) ===\n(.*?)\n=== END ===", prompt, re.DOTALL))
         cfg = files.get("build.cfg")
         if cfg is None:
